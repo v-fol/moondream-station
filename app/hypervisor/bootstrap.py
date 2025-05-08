@@ -15,40 +15,29 @@ from functools import partial
 
 from display_utils import print_banner, Spinner
 from config import DEFAULT_CONFIG
-from misc import download_file
+from misc import download_file, check_platform, get_app_dir
 
+PLATFORM = check_platform()
+if PLATFORM == "macOS":
+    MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
+elif PLATFORM == "macOS":
+    MINIFORGE_MAC_URL = "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+else:
+    sys.exit("Only macOS and Ubuntu are supported.") 
 
-MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
 PYTHON_VERSION = "3.10"
 BOOTSTRAP_VERSION = "v0.0.2"
 HYPERVISOR_TAR_URL = "https://depot.moondream.ai/station/md_station_hypervisor.tar.gz"
 POSTHOG_PROJECT_API_KEY = "phc_8S71qk0L1WlphzX448tekgbnS1ut266W4J48k9kW0Cx"
 SSL_CERT_FILE = "SSL_CERT_FILE"
 
-
-os.environ["SSL_CERT_FILE"] = certifi.where()
-os.environ["DYLD_LIBRARY_PATH"] = (
-    os.path.abspath(".") + ":" + os.environ.get("DYLD_LIBRARY_PATH", "")
-)
+if PLATFORM == "macOS":
+    os.environ["SSL_CERT_FILE"] = certifi.where()
+    os.environ["DYLD_LIBRARY_PATH"] = (
+        os.path.abspath(".") + ":" + os.environ.get("DYLD_LIBRARY_PATH", "")
+    )
 
 sys.stdout.reconfigure(line_buffering=True, write_through=True)
-
-
-def is_macos():
-    """Check if the current platform is macOS.
-
-    Returns:
-        bool: True if running on macOS, False otherwise.
-    """
-    return platform.system().lower().startswith("darwin")
-
-
-def get_app_dir() -> str:
-    """Get the application support directory for Moondream Station."""
-    home = os.path.expanduser("~")
-    app_support_dir = os.path.join(home, "Library", "MoondreamStation")
-    os.makedirs(app_support_dir, exist_ok=True)
-    return app_support_dir
 
 
 def configure_logging(log_dir: str) -> logging.Logger:
@@ -353,9 +342,10 @@ def run_main_loop(venv_dir: str, app_dir: str, logger: logging.Logger):
     python_bin = os.path.join(venv_dir, "bin", "python")
     return_code = 0
 
-    handler = partial(_unset_sll_cert, logger)
-    signal.signal(signal.SIGINT, handler)
-    signal.signal(signal.SIGTERM, handler)
+    if PLATFORM == "macOS":
+        handler = partial(_unset_sll_cert, logger)
+        signal.signal(signal.SIGINT, handler)
+        signal.signal(signal.SIGTERM, handler)
 
     while return_code == 0:
         if not os.path.isfile(main_py):
@@ -613,13 +603,11 @@ def main():
     and launches the hypervisor server loop.
     """
     start_time = time.time()
-    if not is_macos():
-        sys.exit("Only macOS is supported.")
 
     print_banner()
     os.environ["md_ph_k"] = POSTHOG_PROJECT_API_KEY
 
-    app_dir = get_app_dir()
+    app_dir = get_app_dir(PLATFORM)
     logger = configure_logging(app_dir)
 
     os.chdir(app_dir)
