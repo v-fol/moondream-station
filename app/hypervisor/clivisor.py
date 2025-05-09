@@ -202,23 +202,32 @@ def install_moondream_cli(
     # Script to execute the CLI
     script = textwrap.dedent(
         f"""\
-        #!/bin/sh
+        #!/usr/bin/env sh
         exec "{venv_py}" "{cli_py}" "$@"
-    """
+        """
     )
 
     wrapper.write_text(script)
-    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    wrapper.chmod(0o755)  
     logger.debug(f"Installed wrapper → {wrapper}")
 
     # Ensure ~/.local/bin on PATH for zsh + bash (idempotent)
     path_line = 'export PATH="$HOME/.local/bin:$PATH"'
-    for rc in [
-        home / ".zprofile",
-        home / ".zshrc",
-        home / ".bash_profile",
-        home / ".bashrc",
-    ]:
+    if PLATFORM == "macOS":
+        path_files = [
+            home / ".zprofile",
+            home / ".zshrc",
+            home / ".bash_profile",
+            home / ".bashrc",
+        ]
+    else:
+        path_files = [
+            home / ".profile",
+            home / ".zshrc",
+            home / ".bashrc",
+        ]
+
+    for rc in path_files:
         try:
             if rc.exists():
                 lines = rc.read_text().splitlines()
