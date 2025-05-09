@@ -17,10 +17,11 @@ from starlette.background import BackgroundTask
 
 from hypervisor import Hypervisor
 from display_utils import RUNNING
+from misc import get_app_dir
 
 
 def configure_logging() -> logging.Logger:
-    app_dir = os.path.join(os.path.expanduser("~"), "Library", "MoondreamStation")
+    app_dir = get_app_dir()
 
     logger = logging.getLogger("hypervisor")
     logger.setLevel(logging.DEBUG)
