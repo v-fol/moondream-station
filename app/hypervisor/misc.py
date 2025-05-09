@@ -56,6 +56,8 @@ def get_app_dir(platform) -> str:
     elif platform == "ubuntu":
         app_dir = Path(os.environ.get("XDG_DATA_HOME",
                            Path.home() / ".local" / "share"))
+    else:
+        raise ValueError("Can only get app_dir for macOS and Ubuntu")
     
     app_dir = app_dir / "MoondreamStation"
     os.makedirs(app_dir, exist_ok=True)

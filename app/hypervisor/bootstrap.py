@@ -10,6 +10,7 @@ import tarfile
 import json
 import shutil
 import signal
+import shlex
 
 from functools import partial
 
@@ -403,6 +404,45 @@ def download_and_extract_hypervisor(app_dir: str, logger: logging.Logger) -> boo
             os.remove(tar_path)
         raise
 
+def launch_update_bash_mac(update_script_path: str, bootstrap_exe: str, current_app_bundle: str):
+    """
+    Use apple script to launch update_bootstrap.sh
+    """
+    osa_cmd = [
+        "osascript",
+        "-e",
+        (
+            'tell application "Terminal"\n'
+            "    activate\n"
+            f'    do script "/bin/bash \\"{update_script_path}\\" '
+            f'\\"{bootstrap_exe}\\" \\"{current_app_bundle}\\" {os.getpid()} 2"\n'
+            "end tell"
+        ),
+    ]
+    subprocess.Popen(osa_cmd)
+
+def launch_update_bash_ubuntu(update_script_path: str, bootstrap_exe: str, current_app_bundle: str):
+    """
+    Launch update bootstrap.sh in a new session
+    """
+    cmd = [
+        "gnome-terminal",
+        "--",
+        "bash",
+        "-c",
+        (
+            f'{shlex.quote(str(update_script_path))} '
+            f'{shlex.quote(str(bootstrap_exe))} '
+            f'{shlex.quote(str(current_app_bundle))} '
+            f'{os.getpid()} 2; exec bash'
+        ),
+    ]
+
+    subprocess.Popen(
+        cmd,
+        start_new_session=True,
+        close_fds=True,
+    )
 
 def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
     """Check for bootstrap updates in the manifest and update if needed.
@@ -447,12 +487,13 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
 
         # Walk up until we reach the *.app bundle root
         current_app_bundle = current_exe
-        while not current_app_bundle.endswith(
-            ".app"
-        ) and current_app_bundle != os.path.dirname(current_app_bundle):
-            current_app_bundle = os.path.dirname(current_app_bundle)
+        if PLATFORM == "macOS":
+            while not current_app_bundle.endswith(
+                ".app"
+            ) and current_app_bundle != os.path.dirname(current_app_bundle):
+                current_app_bundle = os.path.dirname(current_app_bundle)
 
-        if not current_app_bundle.endswith(".app") or not os.path.isdir(
+        if not current_app_bundle.endswith(".app") or not os.path.isfile(
             current_app_bundle
         ):
             logger.error(f"Failed to locate the running *.app bundle for {current_exe}")
@@ -482,15 +523,13 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
             with tarfile.open(tar_path, "r:gz") as tar:
                 tar.extractall(path=download_dir)
 
+            if PLATFORM == "macOS":
+                app_name = "Moondream Station.app"
+            else:
+                app_name = "MoondreamStation"
             bootstrap_exe = os.path.join(
-                download_dir, "moondream_station", "Moondream Station.app"
+                download_dir, "moondream_station", app_name
             )
-
-            if os.path.isfile(bootstrap_exe):
-                logger.error(
-                    f"Error: Expected bootstrap executable not found in archive"
-                )
-                return False
 
             logger.info(f"Found bootstrap executable at {bootstrap_exe}")
 
@@ -512,18 +551,12 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
             )
 
             # Launch the updater in its own Terminal window.
-            osa_cmd = [
-                "osascript",
-                "-e",
-                (
-                    'tell application "Terminal"\n'
-                    "    activate\n"
-                    f'    do script "/bin/bash \\"{update_script_path}\\" '
-                    f'\\"{bootstrap_exe}\\" \\"{current_app_bundle}\\" {os.getpid()} 2"\n'
-                    "end tell"
-                ),
-            ]
-            subprocess.Popen(osa_cmd)
+            if PLATFORM == "macOS":
+                launch_update_bash_mac(update_script_path, bootstrap_exe, current_app_bundle)
+            elif PLATFORM == "ubuntu":
+                launch_update_bash_ubuntu(update_script_path, bootstrap_exe, current_app_bundle)
+            else:
+                raise ValueError("Failed to launch bootstrap update script. Platform must be macOS or Ubuntu")
 
         except Exception as e:
             logger.error(f"Error during bootstrap update: {e}")
@@ -630,12 +663,16 @@ def main():
     update_config_bootstrap_version(app_dir, logger)
 
     if not is_setup(app_dir):
-        logger.error("Set up failed, resetting app_dir")
-        result = subprocess.run(["rm", "-rf", str(app_dir)], check=True)
-        logger.info(result)
-        print(
-            "Setup failed. Try restarting the app, if this continues to fail, try redownloading the app."
-        )
+        if "moondream" not in app_dir.split("/")[-1].lower():
+            logger.warning(f"Potential issue clearing the app_dir: {app_dir}, 'moondream' must in in its name. If you still want to delete this directory, do so manually.")
+        else:
+            logger.error("Set up failed, resetting app_dir")
+            result = subprocess.run(["rm", "-rf", str(app_dir)], check=True)
+            logger.info(result)
+            print(
+                "Setup failed. Try restarting the app, if this continues to fail, try redownloading the app."
+            )
+            
         sys.exit(1)
 
     elapsed_time = time.time() - start_time
