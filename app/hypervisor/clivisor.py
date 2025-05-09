@@ -5,12 +5,14 @@ from pathlib import Path
 import os, stat, textwrap
 import subprocess
 import shutil
+import shlex
 
 from config import Config
 from manifest import Manifest
-from misc import download_file
+from misc import download_file, check_platform
 
 logger = logging.getLogger("hypervisor")
+PLATFORM = check_platform()
 
 
 class CLIVisor:
@@ -41,19 +43,41 @@ class CLIVisor:
         # Launch CLI in a new terminal window as a non-blocking subprocess
         logger.info("Launching CLI in a new window")
         try:
-            # Create an AppleScript command to open a new Terminal window and run the moondream-cli command
-            applescript = """
-            tell application "Terminal"
-                do script "moondream"
-            end tell
-            """
-            subprocess.Popen(["osascript", "-e", applescript])
-            logger.info("CLI launched successfully in new window")
+            if PLATFORM == "macOS":
+                self.launch_cli_mac()
+            elif PLATFORM == "ubuntu":
+                self.launch_cli_ubuntu()
+            else:
+                raise ValueError(f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}")
+           
         except Exception as e:
             logger.error(f"Failed to launch CLI in new window: {e}")
 
         print(
             "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
+        )
+    
+    def launch_cli_mac():
+        applescript = """
+        tell application "Terminal"
+            do script "moondream"
+        end tell
+        """
+        subprocess.Popen(["osascript", "-e", applescript])
+        logger.info("CLI launched successfully in new window")
+
+    def launch_cli_ubuntu():
+        cmd = [
+            "gnome-terminal",
+            "--",
+            "bash",
+            "-c",
+            f"{shlex.quote("moondream")}; exec bash",
+        ]
+        subprocess.Popen(
+            cmd,
+            start_new_session=True,
+            close_fds=True,
         )
 
     def check_for_update(self, update_manifest: bool = True) -> dict:

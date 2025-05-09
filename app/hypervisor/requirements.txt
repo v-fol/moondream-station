@@ -6,3 +6,4 @@ requests==2.31.0
 pillow==10.4.0
 moondream==0.1.0
 posthog==4.0.0
+distro
