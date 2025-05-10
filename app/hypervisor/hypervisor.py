@@ -13,7 +13,7 @@ from inferencevisor import InferenceVisor
 from clivisor import CLIVisor
 from manifest import Manifest
 from config import Config
-from misc import download_file
+from misc import download_file, get_app_dir
 
 logger = logging.getLogger("hypervisor")
 HYPERVISOR_VERSION = "v0.0.1"
@@ -34,6 +34,8 @@ class Hypervisor:
         self.manifest = Manifest()
         self.inferencevisor = InferenceVisor(self.config, self.manifest)
         self.clivisor = CLIVisor(self.config, self.manifest)
+
+        self.app_dir = get_app_dir()
 
         self.posthog = None
         if md_ph_k := os.environ.get("md_ph_k"):
@@ -205,15 +207,6 @@ class Hypervisor:
         sys.exit(99)
 
     # -------------------- Admin --------------------
-    @property
-    def app_dir(self):
-        """
-        Get the application directory path.
-
-        Returns:
-            str: Path to the Moondream Station application directory
-        """
-        return os.path.join(os.path.expanduser("~"), "Library", "MoondreamStation")
 
     def posthog_capture(
         self, event: str, properties: Optional[dict[str, Any]] = None
