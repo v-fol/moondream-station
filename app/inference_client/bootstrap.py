@@ -14,15 +14,6 @@ MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.
 PYTHON_VERSION = "3.10"
 
 
-def is_macos():
-    """Check if the current platform is macOS.
-
-    Returns:
-        bool: True if running on macOS, False otherwise.
-    """
-    return platform.system().lower().startswith("darwin")
-
-
 def get_executable_dir() -> str:
     """Get the directory of the bootstrap executable."""
     return os.path.dirname(os.path.abspath(sys.executable))
