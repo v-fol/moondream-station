@@ -45,18 +45,20 @@ class CLIVisor:
         try:
             if PLATFORM == "macOS":
                 self.launch_cli_mac()
-            elif PLATFORM == "ubuntu":
-                self.launch_cli_ubuntu()
+            # elif PLATFORM == "ubuntu":
+            #     self.launch_cli_ubuntu()
             else:
-                raise ValueError(f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}")
-           
+                raise ValueError(
+                    f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}"
+                )
+
         except Exception as e:
             logger.error(f"Failed to launch CLI in new window: {e}")
 
         print(
             "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
         )
-    
+
     def launch_cli_mac():
         applescript = """
         tell application "Terminal"
@@ -72,7 +74,7 @@ class CLIVisor:
             "--",
             "bash",
             "-c",
-            f"{shlex.quote("moondream")}; exec bash",
+            f"{shlex.quote('moondream')}; exec bash",
         ]
         subprocess.Popen(
             cmd,
@@ -208,7 +210,7 @@ def install_moondream_cli(
     )
 
     wrapper.write_text(script)
-    wrapper.chmod(0o755)  
+    wrapper.chmod(0o755)
     logger.debug(f"Installed wrapper → {wrapper}")
 
     # Ensure ~/.local/bin on PATH for zsh + bash (idempotent)

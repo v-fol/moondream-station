@@ -21,10 +21,10 @@ from misc import download_file, check_platform, get_app_dir
 PLATFORM = check_platform()
 if PLATFORM == "macOS":
     MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
-elif PLATFORM == "macOS":
+elif PLATFORM == "ubuntu":
     MINIFORGE_MAC_URL = "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
 else:
-    sys.exit("Only macOS and Ubuntu are supported.") 
+    sys.exit(f"Only macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
 
 PYTHON_VERSION = "3.10"
 BOOTSTRAP_VERSION = "v0.0.2"
@@ -404,7 +404,10 @@ def download_and_extract_hypervisor(app_dir: str, logger: logging.Logger) -> boo
             os.remove(tar_path)
         raise
 
-def launch_update_bash_mac(update_script_path: str, bootstrap_exe: str, current_app_bundle: str):
+
+def launch_update_bash_mac(
+    update_script_path: str, bootstrap_exe: str, current_app_bundle: str
+):
     """
     Use apple script to launch update_bootstrap.sh
     """
@@ -421,7 +424,10 @@ def launch_update_bash_mac(update_script_path: str, bootstrap_exe: str, current_
     ]
     subprocess.Popen(osa_cmd)
 
-def launch_update_bash_ubuntu(update_script_path: str, bootstrap_exe: str, current_app_bundle: str):
+
+def launch_update_bash_ubuntu(
+    update_script_path: str, bootstrap_exe: str, current_app_bundle: str
+):
     """
     Launch update bootstrap.sh in a new session
     """
@@ -431,10 +437,10 @@ def launch_update_bash_ubuntu(update_script_path: str, bootstrap_exe: str, curre
         "bash",
         "-c",
         (
-            f'{shlex.quote(str(update_script_path))} '
-            f'{shlex.quote(str(bootstrap_exe))} '
-            f'{shlex.quote(str(current_app_bundle))} '
-            f'{os.getpid()} 2; exec bash'
+            f"{shlex.quote(str(update_script_path))} "
+            f"{shlex.quote(str(bootstrap_exe))} "
+            f"{shlex.quote(str(current_app_bundle))} "
+            f"{os.getpid()} 2; exec bash"
         ),
     ]
 
@@ -443,6 +449,7 @@ def launch_update_bash_ubuntu(update_script_path: str, bootstrap_exe: str, curre
         start_new_session=True,
         close_fds=True,
     )
+
 
 def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
     """Check for bootstrap updates in the manifest and update if needed.
@@ -527,9 +534,7 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
                 app_name = "Moondream Station.app"
             else:
                 app_name = "MoondreamStation"
-            bootstrap_exe = os.path.join(
-                download_dir, "moondream_station", app_name
-            )
+            bootstrap_exe = os.path.join(download_dir, "moondream_station", app_name)
 
             logger.info(f"Found bootstrap executable at {bootstrap_exe}")
 
@@ -552,11 +557,17 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
 
             # Launch the updater in its own Terminal window.
             if PLATFORM == "macOS":
-                launch_update_bash_mac(update_script_path, bootstrap_exe, current_app_bundle)
+                launch_update_bash_mac(
+                    update_script_path, bootstrap_exe, current_app_bundle
+                )
             elif PLATFORM == "ubuntu":
-                launch_update_bash_ubuntu(update_script_path, bootstrap_exe, current_app_bundle)
+                launch_update_bash_ubuntu(
+                    update_script_path, bootstrap_exe, current_app_bundle
+                )
             else:
-                raise ValueError("Failed to launch bootstrap update script. Platform must be macOS or Ubuntu")
+                raise ValueError(
+                    "Failed to launch bootstrap update script. Platform must be macOS or Ubuntu"
+                )
 
         except Exception as e:
             logger.error(f"Error during bootstrap update: {e}")
@@ -664,7 +675,9 @@ def main():
 
     if not is_setup(app_dir):
         if "moondream" not in app_dir.split("/")[-1].lower():
-            logger.warning(f"Potential issue clearing the app_dir: {app_dir}, 'moondream' must in in its name. If you still want to delete this directory, do so manually.")
+            logger.warning(
+                f"Potential issue clearing the app_dir: {app_dir}, 'moondream' must in in its name. If you still want to delete this directory, do so manually."
+            )
         else:
             logger.error("Set up failed, resetting app_dir")
             result = subprocess.run(["rm", "-rf", str(app_dir)], check=True)
@@ -672,7 +685,7 @@ def main():
             print(
                 "Setup failed. Try restarting the app, if this continues to fail, try redownloading the app."
             )
-            
+
         sys.exit(1)
 
     elapsed_time = time.time() - start_time
