@@ -13,10 +13,11 @@ from inferencevisor import InferenceVisor
 from clivisor import CLIVisor
 from manifest import Manifest
 from config import Config
-from misc import download_file, get_app_dir
+from misc import download_file, get_app_dir, check_platform
 
 logger = logging.getLogger("hypervisor")
 HYPERVISOR_VERSION = "v0.0.1"
+PLATFORM = check_platform()
 
 
 class Hypervisor:
@@ -35,7 +36,7 @@ class Hypervisor:
         self.inferencevisor = InferenceVisor(self.config, self.manifest)
         self.clivisor = CLIVisor(self.config, self.manifest)
 
-        self.app_dir = get_app_dir()
+        self.app_dir = get_app_dir(PLATFORM)
 
         self.posthog = None
         if md_ph_k := os.environ.get("md_ph_k"):

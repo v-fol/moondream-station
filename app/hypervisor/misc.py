@@ -55,7 +55,9 @@ def check_platform() -> str:
         return "ubuntu"
 
 
-def get_app_dir(platform) -> str:
+def get_app_dir(platform: str = None) -> str:
+    if platform is None:
+        platform = check_platform()
     """Get the application support directory for Moondream Station."""
     if platform == "macOS":
         app_dir = Path.home() / "Library"
