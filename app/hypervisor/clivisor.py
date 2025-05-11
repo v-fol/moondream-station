@@ -40,6 +40,13 @@ class CLIVisor:
                 os.path.join(self.base_dir, ".venv"),
             )
 
+        # TMP for testing
+        print("installing cli to path")
+        install_moondream_cli(
+            cli_path,
+            os.path.join(self.base_dir, ".venv"),
+        )
+
         # Launch CLI in a new terminal window as a non-blocking subprocess
         logger.info("Launching CLI in a new window")
         try:
@@ -192,8 +199,10 @@ def install_moondream_cli(
     venv_py = Path(venv_path).expanduser().resolve() / "bin" / "python"
 
     if not cli_py.exists():
+        logger.info("CLI not found")
         raise FileNotFoundError(f"CLI file not found: {cli_py}")
     if not venv_py.exists():
+        logger.info("Python not found while trying to install CLI")
         raise FileNotFoundError(f"Python interpreter not found: {venv_py}")
 
     home = Path.home()
@@ -209,7 +218,9 @@ def install_moondream_cli(
         """
     )
 
+    print("About to write CLI script")
     wrapper.write_text(script)
+    print("About to chmod CLI script")
     wrapper.chmod(0o755)
     logger.debug(f"Installed wrapper → {wrapper}")
 

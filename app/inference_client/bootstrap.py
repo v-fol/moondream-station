@@ -9,9 +9,18 @@ import logging
 import signal
 
 from functools import partial
+from misc import check_platform
 
 MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
 PYTHON_VERSION = "3.10"
+
+PLATFORM = check_platform()
+if PLATFORM == "macOS":
+    MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
+elif PLATFORM == "ubuntu":
+    MINIFORGE_MAC_URL = "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+else:
+    sys.exit(f"Only macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
 
 
 def get_executable_dir() -> str:
@@ -328,8 +337,6 @@ def run_main_loop(venv_dir: str, args: list[str], logger: logging.Logger):
 
 def main():
     start_time = time.time()
-    if not is_macos():
-        sys.exit("Only macOS is supported.")
 
     exe_dir = get_executable_dir()
     logger = configure_logging(exe_dir)

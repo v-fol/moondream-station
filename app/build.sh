@@ -34,12 +34,35 @@ build_inference() {
 
 build_hypervisor() {
     local PYI_ARGS
+
     if [[ "$PLATFORM" = "mac" ]]; then
-        PYI_ARGS="--windowed"   # .app bundle
+        # macOS always embeds Python.framework for us
+        PYI_ARGS="--windowed"
     elif [[ "$PLATFORM" = "ubuntu" ]]; then
-        PYI_ARGS="--onefile"
+        # Issue with ubuntu and the py .so, bundling it. Should also let us run on <Ubuntu 22
+        local LIBPYTHON
+        LIBPYTHON=$(
+            python - <<'PY'
+import sys, sysconfig, pathlib, os
+libdir = pathlib.Path(sysconfig.get_config_var("LIBDIR") or "")
+libname = sysconfig.get_config_var("LDLIBRARY") or ""
+p = libdir / libname
+if not p.exists():
+    sys.stderr.write(
+        f"ERROR: shared interpreter {p} not found – was Python built "
+        "--enable-shared?\n"
+    )
+    sys.exit(1)
+# Print in the SRC:DEST format expected by --add-binary
+print(f"{p}{os.pathsep}.")
+PY
+        ) || exit 1
+
+        # Build a single-file executable and drop libpython next to the bootstrap
+        PYI_ARGS="--onefile --add-binary ${LIBPYTHON}"
     else
-        echo "Unknown platform '$PLATFORM' (mac|ubuntu)" >&2; exit 1
+        echo "Unknown platform '$PLATFORM' (mac|ubuntu)" >&2
+        exit 1
     fi
 
     local NAME="moondream_station"
@@ -104,8 +127,9 @@ prepare_dev() {
     # copy hypervisor supplements
     local HYP_SRC="../output/moondream-station-files"
     local HYP_FILES=(
-        clivisor.py config.py display_utils.py hypervisor_server.py hypervisor.py
-        inferencevisor.py manifest.py misc.py
+        hypervisor_server.py hypervisor.py inferencevisor.py requirements.txt
+        manifest.py config.py misc.py update_bootstrap.sh clivisor.py
+        display_utils.py
     )
     for f in "${HYP_FILES[@]}"; do
         cp "$HYP_SRC/$f" "$DEV_DIR/"
