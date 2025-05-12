@@ -224,7 +224,16 @@ def install_moondream_cli(
     wrapper.chmod(0o755)
     logger.debug(f"Installed wrapper → {wrapper}")
 
-    # Ensure ~/.local/bin on PATH for zsh + bash (idempotent)
+    # For VS code and some containers, PATH gets over written. Create symlink so the wrapper can still be accessed.
+    if PLATFORM == "ubuntu":
+        try:
+            usr_local = Path("/usr/local/bin") / cli_name
+            if not usr_local.exists():
+                usr_local.symlink_to(wrapper)
+                logger.debug(f"Symlinked {usr_local} → {wrapper}")
+        except Exception as e:
+            logger.debug(f"Could not create /usr/local/bin symlink: {e}")
+
     path_line = 'export PATH="$HOME/.local/bin:$PATH"'
     if PLATFORM == "macOS":
         path_files = [
@@ -251,18 +260,13 @@ def install_moondream_cli(
                 lines = []
                 print(f"{rc} did not exist")
             if path_line not in lines:
-                if rc.name == ".bashrc":
-                    # ↳ PREPEND so it runs before the early 'return'
-                    text = rc.read_text()
-                    new_text = path_line + "\n" + text
-                    rc.write_text(new_text)
-                else:
-                    with rc.open("a") as f:
-                        if lines:
-                            f.write("\n")
-                        f.write(path_line + "\n")
-                    logger.debug(f"Added PATH line to {rc.name}")
-                    print(f"added path to {rc}, name: {rc.name}")
+                print(f"appending {rc.name}")
+                with rc.open("a") as f:
+                    if lines:
+                        f.write("\n")
+                    f.write(path_line + "\n")
+                logger.debug(f"Added PATH line to {rc.name}")
+                print(f"added path to {rc}, name: {rc.name}")
             else:
                 print(f"pathline already in lines for for rc: {rc}, name: {rc.name}")
         except OSError as e:
