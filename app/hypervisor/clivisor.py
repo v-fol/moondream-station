@@ -236,22 +236,35 @@ def install_moondream_cli(
     else:
         path_files = [
             home / ".profile",
+            home / ".bash_profile",
             home / ".zshrc",
             home / ".bashrc",
         ]
 
     for rc in path_files:
         try:
+            print(f"trying to add CLI to {rc}")
             if rc.exists():
                 lines = rc.read_text().splitlines()
+                print(f"{rc} exists")
             else:
                 lines = []
+                print(f"{rc} did not exist")
             if path_line not in lines:
-                with rc.open("a") as f:
-                    if lines:
-                        f.write("\n")
-                    f.write(path_line + "\n")
-                logger.debug(f"Added PATH line to {rc.name}")
+                if rc.name == ".bashrc":
+                    # ↳ PREPEND so it runs before the early 'return'
+                    text = rc.read_text()
+                    new_text = path_line + "\n" + text
+                    rc.write_text(new_text)
+                else:
+                    with rc.open("a") as f:
+                        if lines:
+                            f.write("\n")
+                        f.write(path_line + "\n")
+                    logger.debug(f"Added PATH line to {rc.name}")
+                    print(f"added path to {rc}, name: {rc.name}")
+            else:
+                print(f"pathline already in lines for for rc: {rc}, name: {rc.name}")
         except OSError as e:
             logger.error(f"⚠️  Could not update {rc}: {e}")
             print(f"⚠️  Could not update {rc}: {e}")

@@ -284,14 +284,6 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
         raise FileNotFoundError(f"Cannot find {python_bin}")
 
     logger.info("Upgrading pip...")
-    # TMP
-    result = subprocess.run(
-        ["pwd"],  # command to run
-        capture_output=True,  # grab stdout / stderr instead of showing them
-        text=True,  # decode to str instead of bytes
-        check=True,  # raise CalledProcessError if exit status ≠ 0
-    )
-    print(result.stdout.strip())
 
     res = subprocess.run(
         [python_bin, "-m", "pip", "install", "--upgrade", "pip"],
