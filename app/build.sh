@@ -51,7 +51,8 @@ PY
     for f in "${FILES[@]}"; do
         cp "$SRC_DIR/$f" "$DIST_DIR"
     done
-    tar -czf "../output/inference_bootstrap.tar.gz" -C "$DIST_DIR" .
+    echo "!!!!!! my current working dir is $PWD"
+    tar -czf "../output/inference_bootstrap.tar.gz" -C "../output" "inference_bootstrap"
     echo "✔ inference → $DIST_DIR"
 }
 

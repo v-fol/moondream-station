@@ -54,7 +54,9 @@ class InferenceVisor:
             logger.info(f"Set active model to latest: {model}")
 
         client_path = os.path.join(self.inference_dir, version)
-        bootstrap_path = os.path.join(client_path, "inference_bootstrap")
+        bootstrap_path = os.path.join(
+            client_path, "inference_bootstrap", "inference_bootstrap"
+        )
 
         logger.debug(f"Looking for inference bootstrap at: {bootstrap_path}")
 
@@ -180,13 +182,15 @@ class InferenceVisor:
             os.remove(download_path)
 
             # Set executable permissions on all possible bootstrap executable locations
-            bootstrap_path = os.path.join(extract_dir, "inference_bootstrap")
+            bootstrap_paths = [
+                os.path.join(extract_dir, "inference_bootstrap"),
+                os.path.join(extract_dir, "inference_bootstrap", "inference_bootstrap"),
+            ]
 
-            if os.path.exists(bootstrap_path) and not os.access(
-                bootstrap_path, os.X_OK
-            ):
-                logger.debug(f"Setting executable permissions on {bootstrap_path}")
-                os.chmod(bootstrap_path, 0o755)
+            for path in bootstrap_paths:
+                if os.path.exists(path) and not os.access(path, os.X_OK):
+                    logger.debug(f"Setting executable permissions on {path}")
+                    os.chmod(path, 0o755)
 
             self.status = "download successful"
             logger.info(f"Downloaded and extracted inference client {version}")
