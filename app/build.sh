@@ -15,6 +15,28 @@ build_inference() {
     local SRC_DIR="../app/inference_client"
     local FILES=(main.py model_service.py requirements.txt)
 
+    local LIBPYTHON
+        LIBPYTHON=$(
+python - <<'PY'
+import os, sysconfig, pathlib, sys
+libdir = pathlib.Path(sysconfig.get_config_var("LIBDIR") or "")
+ver     = sysconfig.get_config_var("LDVERSION")          # e.g. 3.10
+wanted  = libdir / f"libpython{ver}.so.1.0"              # soname
+# fall back to the un-versioned file only if the soname is missing
+for p in (wanted, libdir / f"libpython{ver}.so"):
+    if p.exists():
+        # always *install* it under the soname so the boot-loader sees it
+        print(f"{p}{os.pathsep}libpython{ver}.so.1.0")
+        break
+else:
+    sys.stderr.write("ERROR: libpython with --enable-shared not found\n")
+    sys.exit(1)
+PY
+) || exit 1
+
+        # Build a single-file executable and drop libpython next to the bootstrap
+        PYI_ARGS="--onefile --add-binary ${LIBPYTHON}"
+
     echo "Building 'inference'..."
     rm -rf "$DIST_DIR"; mkdir -p "$DIST_DIR"
 
@@ -29,6 +51,7 @@ build_inference() {
     for f in "${FILES[@]}"; do
         cp "$SRC_DIR/$f" "$DIST_DIR"
     done
+    tar -czf "../output/inference_bootstrap.tar.gz" -C "$DIST_DIR" .
     echo "✔ inference → $DIST_DIR"
 }
 
@@ -42,21 +65,22 @@ build_hypervisor() {
         # Issue with ubuntu and the py .so, bundling it. Should also let us run on <Ubuntu 22
         local LIBPYTHON
         LIBPYTHON=$(
-            python - <<'PY'
-import sys, sysconfig, pathlib, os
+python - <<'PY'
+import os, sysconfig, pathlib, sys
 libdir = pathlib.Path(sysconfig.get_config_var("LIBDIR") or "")
-libname = sysconfig.get_config_var("LDLIBRARY") or ""
-p = libdir / libname
-if not p.exists():
-    sys.stderr.write(
-        f"ERROR: shared interpreter {p} not found – was Python built "
-        "--enable-shared?\n"
-    )
+ver     = sysconfig.get_config_var("LDVERSION")          # e.g. 3.10
+wanted  = libdir / f"libpython{ver}.so.1.0"              # soname
+# fall back to the un-versioned file only if the soname is missing
+for p in (wanted, libdir / f"libpython{ver}.so"):
+    if p.exists():
+        # always *install* it under the soname so the boot-loader sees it
+        print(f"{p}{os.pathsep}libpython{ver}.so.1.0")
+        break
+else:
+    sys.stderr.write("ERROR: libpython with --enable-shared not found\n")
     sys.exit(1)
-# Print in the SRC:DEST format expected by --add-binary
-print(f"{p}{os.pathsep}.")
 PY
-        ) || exit 1
+) || exit 1
 
         # Build a single-file executable and drop libpython next to the bootstrap
         PYI_ARGS="--onefile --add-binary ${LIBPYTHON}"
@@ -89,7 +113,8 @@ PY
     for f in "${FILES[@]}"; do
         cp "$SRC_DIR/$f" "$SUP_DIR/"
     done
-    tar -czf "$DIST_DIR/hypervisor.tar.gz" -C "$SUP_DIR" .
+    tar -czf "../output/hypervisor.tar.gz" -C "$SUP_DIR" .
+    tar -czf "../output/moondream_station_ubuntu.tar.gz" -C "$DIST_DIR" moondream_station
     echo "✔ hypervisor → $DIST_DIR"
 }
 

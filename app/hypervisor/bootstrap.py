@@ -28,7 +28,9 @@ else:
 
 PYTHON_VERSION = "3.10"
 BOOTSTRAP_VERSION = "v0.0.2"
-HYPERVISOR_TAR_URL = "https://depot.moondream.ai/station/md_station_hypervisor.tar.gz"
+HYPERVISOR_TAR_URL = (
+    "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/hypervisor.tar.gz"
+)
 POSTHOG_PROJECT_API_KEY = "phc_8S71qk0L1WlphzX448tekgbnS1ut266W4J48k9kW0Cx"
 SSL_CERT_FILE = "SSL_CERT_FILE"
 
