@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import tarfile
 from pathlib import Path
 import os, stat, textwrap
@@ -66,7 +67,8 @@ class CLIVisor:
             "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
         )
 
-    def launch_cli_mac():
+    def launch_cli_mac(self):
+        """Launch the moondream CLI in a new terminal window on macOS."""
         applescript = """
         tell application "Terminal"
             do script "moondream"
@@ -75,19 +77,30 @@ class CLIVisor:
         subprocess.Popen(["osascript", "-e", applescript])
         logger.info("CLI launched successfully in new window")
 
-    def launch_cli_ubuntu():
-        cmd = [
-            "gnome-terminal",
-            "--",
-            "bash",
-            "-c",
-            f"{shlex.quote('moondream')}; exec bash",
-        ]
-        subprocess.Popen(
-            cmd,
-            start_new_session=True,
-            close_fds=True,
+    def launch_cli_ubuntu(self):
+        """Launch the moondream CLI in the current terminal window.
+
+        This launches the CLI in the current terminal so it can take input and
+        produce output, but the main app continues running in the background.
+        """
+        print("\nLaunching Moondream CLI in the current terminal...\n")
+
+        # Create a new process group so the CLI can take over terminal I/O
+        # but without blocking the main app
+        process = subprocess.Popen(
+            ["moondream"],
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+            # This allows the CLI to control the terminal
+            # but the main app continues executing
+            preexec_fn=os.setpgrp,
         )
+
+        # Don't wait for the process, let it run independently
+        logger.debug(f"CLI process started with PID {process.pid}")
+        # Store the process in case we need to reference it later
+        self.cli_process = process
 
     def check_for_update(self, update_manifest: bool = True) -> dict:
         """
