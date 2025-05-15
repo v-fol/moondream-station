@@ -100,9 +100,7 @@ class InferenceVisor:
             if self.config.active_model:
                 cmd.extend(["--revision", self.config.active_model])
 
-            with Spinner(
-                f"Starting inference server with model {self.config.active_model}..."
-            ):
+            with Spinner(f"Loading Model {self.config.active_model}..."):
                 self.process = subprocess.Popen(
                     cmd,
                     cwd=client_path,
@@ -143,7 +141,7 @@ class InferenceVisor:
                     # Wait before checking again
                     time.sleep(3)
 
-            print(f"Inference server ready with model {self.config.active_model}")
+            print(f"Inference server ready with model: {self.config.active_model}")
             self.status = "ok"
             return {
                 "status": "ok",

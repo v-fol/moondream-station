@@ -372,8 +372,6 @@ def run_main_loop(venv_dir: str, app_dir: str, logger: logging.Logger):
             return
 
         logger.info(f"Launching {main_py} via {python_bin}")
-        # Minimal output to stdout
-        print(f"Launching Moondream Station...")
 
         proc = subprocess.Popen([python_bin, main_py])
         return_code = proc.wait()
@@ -733,8 +731,6 @@ def main(verbose: bool = False):
 
     elapsed_time = time.time() - start_time
     logger.info(f"Bootup completed in {elapsed_time:.2f} seconds")
-    print(f"Bootup completed in {elapsed_time:.2f} seconds")
-    print("Starting Moondream Station...\n")
 
     run_main_loop(venv_dir, app_dir, logger)
 

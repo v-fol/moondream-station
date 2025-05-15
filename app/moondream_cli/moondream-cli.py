@@ -39,6 +39,8 @@ def main():
         help="Start the CLI in interactive shell mode (REPL)",
     )
 
+    parser.add_argument("--station", action="store_true", help=argparse.SUPPRESS)
+
     # Create subparsers with a default help message
     subparsers = parser.add_subparsers(
         dest="command",
@@ -251,7 +253,8 @@ def main():
     # Start in REPL mode if no arguments are provided or --repl flag is used
     if len(sys.argv) == 1 or args.repl:
         repl = MoondreamREPL(
-            args.server if hasattr(args, "server") else "http://localhost:2020"
+            args.server if hasattr(args, "server") else "http://localhost:2020",
+            attached_station=args.station,
         )
         repl.run()
         sys.exit(0)

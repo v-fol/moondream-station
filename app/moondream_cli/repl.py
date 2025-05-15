@@ -4,18 +4,24 @@ import readline
 import time
 
 from typing import List
+
 from moondream_cli.cli import HypervisorCLI
 from moondream_cli.formatters import (
     MOONDREAM_BANNER,
     model_commands_box,
     admin_commands_box,
 )
+from moondream_cli.utils.helpers import check_platform
+
+PLATFORM = check_platform()
 
 
 class MoondreamREPL:
     """Interactive REPL for Moondream CLI."""
 
-    def __init__(self, server_url: str = "http://localhost:2020"):
+    def __init__(
+        self, server_url: str = "http://localhost:2020", attached_station: bool = False
+    ):
         """Initialize the REPL with a CLI instance."""
         self.cli = HypervisorCLI(server_url)
         self.running = True
@@ -30,6 +36,7 @@ class MoondreamREPL:
             "health": self.health,
             "admin": self.admin,
         }
+        self.attached_station = attached_station
 
         # Set up readline with history and completion
         self.history_file = os.path.expanduser("~/.moondream_history")
@@ -97,7 +104,9 @@ class MoondreamREPL:
 
     def run(self):
         """Start the REPL loop."""
-        print(self.banner)
+
+        if not self.attached_station:
+            print(self.banner)
 
         # Display the simplified top-level commands at startup
         self.show_top_level_commands()

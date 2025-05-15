@@ -2,7 +2,6 @@ import platform
 import urllib.request
 import os
 from pathlib import Path
-import shutil
 
 
 def parse_version(version: str) -> tuple[int, ...]:

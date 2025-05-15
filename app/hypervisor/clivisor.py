@@ -41,8 +41,6 @@ class CLIVisor:
                 os.path.join(self.base_dir, ".venv"),
             )
 
-        # TMP for testing
-        print("installing cli to path")
         install_moondream_cli(
             cli_path,
             os.path.join(self.base_dir, ".venv"),
@@ -63,9 +61,10 @@ class CLIVisor:
         except Exception as e:
             logger.error(f"Failed to launch CLI in new window: {e}")
 
-        print(
-            "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
-        )
+        if PLATFORM == "macOS":
+            print(
+                "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
+            )
 
     def launch_cli_mac(self):
         """Launch the moondream CLI in a new terminal window on macOS."""
@@ -78,28 +77,17 @@ class CLIVisor:
         logger.info("CLI launched successfully in new window")
 
     def launch_cli_ubuntu(self):
-        """Launch the moondream CLI in the current terminal window.
-
-        This launches the CLI in the current terminal so it can take input and
-        produce output, but the main app continues running in the background.
         """
-        print("\nLaunching Moondream CLI in the current terminal...\n")
-
-        # Create a new process group so the CLI can take over terminal I/O
-        # but without blocking the main app
+        Launches MD-CLI in the same terminal screen
+        """
         process = subprocess.Popen(
-            ["moondream"],
+            ["moondream", "--repl", "--station"],
             stdin=sys.stdin,
             stdout=sys.stdout,
             stderr=sys.stderr,
-            # This allows the CLI to control the terminal
-            # but the main app continues executing
-            preexec_fn=os.setpgrp,
         )
 
-        # Don't wait for the process, let it run independently
         logger.debug(f"CLI process started with PID {process.pid}")
-        # Store the process in case we need to reference it later
         self.cli_process = process
 
     def check_for_update(self, update_manifest: bool = True) -> dict:
@@ -149,7 +137,6 @@ class CLIVisor:
         Returns:
             bool: True if download and extraction succeeded
         """
-        print("downloading cli")
         logger.debug(f"Downloading CLI from {url}")
 
         moondream_cli_dir = os.path.join(self.base_dir, "moondream_cli")
@@ -231,9 +218,7 @@ def install_moondream_cli(
         """
     )
 
-    print("About to write CLI script")
     wrapper.write_text(script)
-    print("About to chmod CLI script")
     wrapper.chmod(0o755)
     logger.debug(f"Installed wrapper → {wrapper}")
 
@@ -265,25 +250,21 @@ def install_moondream_cli(
 
     for rc in path_files:
         try:
-            print(f"trying to add CLI to {rc}")
             if rc.exists():
                 lines = rc.read_text().splitlines()
-                print(f"{rc} exists")
             else:
                 lines = []
-                print(f"{rc} did not exist")
             if path_line not in lines:
-                print(f"appending {rc.name}")
                 with rc.open("a") as f:
                     if lines:
                         f.write("\n")
                     f.write(path_line + "\n")
                 logger.debug(f"Added PATH line to {rc.name}")
-                print(f"added path to {rc}, name: {rc.name}")
             else:
-                print(f"pathline already in lines for for rc: {rc}, name: {rc.name}")
+                logger.debug(
+                    f"pathline already in lines for for rc: {rc}, name: {rc.name}"
+                )
         except OSError as e:
             logger.error(f"⚠️  Could not update {rc}: {e}")
-            print(f"⚠️  Could not update {rc}: {e}")
 
     return wrapper

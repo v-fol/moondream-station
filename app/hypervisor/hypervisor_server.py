@@ -455,9 +455,7 @@ def main():
     logger.info(f"Starting hypervisor server on port: {args.port}")
     logger.info(f"Using inference server at: {args.inference_url}")
 
-    print(RUNNING)
     print(f"Moondream Station is running on http://localhost:{args.port}/v1")
-    print("\n")
 
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 

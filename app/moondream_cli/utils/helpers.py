@@ -2,6 +2,7 @@ import sys
 import time
 import itertools
 import threading
+import platform
 
 
 def create_spinner():
@@ -31,3 +32,29 @@ def stop_spinner(stop_spinner_flag, spinner_thread):
     spinner_thread.join()
     sys.stdout.write("\r")
     sys.stdout.flush()
+
+
+def is_macos():
+    """Check if the current platform is macOS.
+
+    Returns:
+        bool: True if running on macOS, False otherwise.
+    """
+    return platform.system().lower().startswith("darwin")
+
+
+def is_ubuntu() -> bool:
+    if platform.system().lower() != "linux":
+        return False
+    try:
+        import distro
+    except ModuleNotFoundError:
+        return False
+    return distro.id() == "ubuntu"
+
+
+def check_platform() -> str:
+    if is_macos():
+        return "macOS"
+    elif is_ubuntu():
+        return "ubuntu"
