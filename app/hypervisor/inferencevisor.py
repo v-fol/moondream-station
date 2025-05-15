@@ -6,6 +6,7 @@ import subprocess
 import shutil
 import tarfile
 import stat
+import time
 
 from typing import Union, Dict, Generator, Any, Optional
 
@@ -13,6 +14,7 @@ from typing import Union, Dict, Generator, Any, Optional
 from config import Config
 from manifest import Manifest
 from misc import download_file
+from display_utils import Spinner
 
 logger = logging.getLogger("hypervisor")
 
@@ -47,11 +49,11 @@ class InferenceVisor:
             # No active client, get most recent from manifest
             version = self.manifest.latest_inference_client["version"]
             self.config.active_inference_client = version
-            logger.info(f"Set active inference client to latest: {version}")
+            logger.debug(f"Set active inference client to latest: {version}")
 
             model = self.manifest.latest_model["revision"]
             self.config.active_model = model
-            logger.info(f"Set active model to latest: {model}")
+            logger.debug(f"Set active model to latest: {model}")
 
         client_path = os.path.join(self.inference_dir, version)
         bootstrap_path = os.path.join(
@@ -61,7 +63,7 @@ class InferenceVisor:
         logger.debug(f"Looking for inference bootstrap at: {bootstrap_path}")
 
         if not os.path.exists(bootstrap_path):
-            logger.debug(f"Inference client {version} not found, downloading...")
+            print(f"Inference client {version} not found, downloading...")
             if not self._download_inference_client(version):
                 self.status = "boot failed"
                 return {
@@ -72,14 +74,15 @@ class InferenceVisor:
         try:
             logger.debug(f"Setting executable permissions on {bootstrap_path}")
 
-            current_permissions = os.stat(bootstrap_path).st_mode
-            os.chmod(
-                bootstrap_path,
-                current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
-            )
+            with Spinner("Preparing inference server..."):
+                current_permissions = os.stat(bootstrap_path).st_mode
+                os.chmod(
+                    bootstrap_path,
+                    current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+                )
 
-            subprocess.run(["chmod", "+x", bootstrap_path], check=True)
-            logger.debug(f"Permissions set successfully")
+                subprocess.run(["chmod", "+x", bootstrap_path], check=True)
+                logger.debug(f"Permissions set successfully")
         except Exception as e:
             self.status = "boot failed"
             logger.error(f"Failed to set permissions: {str(e)}")
@@ -90,28 +93,57 @@ class InferenceVisor:
 
         self._kill_process()
 
-        logger.info(f"Booting inference server {version}")
+        logger.debug(f"Booting inference server {version}")
         try:
             # Revision refers to the Huggingface Moondream revision
             cmd = [bootstrap_path]
             if self.config.active_model:
                 cmd.extend(["--revision", self.config.active_model])
 
-            print("launching inferencevisor w/", cmd)
-            self.process = subprocess.Popen(
-                cmd,
-                cwd=client_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                shell=False,
-            )
-
-            # Check if process started successfully
-            if self.process.poll() is not None:
-                raise Exception(
-                    f"Process exited immediately with code {self.process.returncode}"
+            with Spinner(
+                f"Starting inference server with model {self.config.active_model}..."
+            ):
+                self.process = subprocess.Popen(
+                    cmd,
+                    cwd=client_path,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    shell=False,
                 )
+
+                # Check if process started successfully
+                if self.process.poll() is not None:
+                    raise Exception(
+                        f"Process exited immediately with code {self.process.returncode}"
+                    )
+
+            # Wait for the inference server to be healthy with a timeout
+            with Spinner("Waiting for inference server to be ready..."):
+                start_time = time.time()
+                timeout_minutes = 10
+                timeout_seconds = timeout_minutes * 60
+
+                while True:
+                    health_status = self.check_health()
+                    if health_status.get("inference_server") == "healthy":
+                        break
+
+                    # Check if we've timed out
+                    if time.time() - start_time > timeout_seconds:
+                        self.status = "boot timed out"
+                        logger.error(
+                            f"Inference server startup timed out after {timeout_minutes} minutes"
+                        )
+                        return {
+                            "status": "error",
+                            "message": f"Inference server startup timed out after {timeout_minutes} minutes",
+                        }
+
+                    # Wait before checking again
+                    time.sleep(3)
+
+            print(f"Inference server ready with model {self.config.active_model}")
             self.status = "ok"
             return {
                 "status": "ok",
