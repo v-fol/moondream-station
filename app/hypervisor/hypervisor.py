@@ -283,7 +283,7 @@ class Hypervisor:
 
         Initializes the CLI, inference server, and loads configuration.
         """
-        with Spinner("Starting inference server..."):
+        with Spinner("Starting Inference Server..."):
             self.inferencevisor.boot()
 
         with Spinner("Loading configuration..."):
