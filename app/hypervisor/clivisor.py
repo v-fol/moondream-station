@@ -52,7 +52,10 @@ class CLIVisor:
             if PLATFORM == "macOS":
                 self.launch_cli_mac()
             elif PLATFORM == "ubuntu":
-                self.launch_cli_ubuntu()
+                self.launch_cli_ubuntu(
+                    venv_path=os.path.join(self.base_dir, ".venv"),
+                    cli_py_path=cli_path,
+                )
             else:
                 raise ValueError(
                     f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}"
@@ -76,12 +79,15 @@ class CLIVisor:
         subprocess.Popen(["osascript", "-e", applescript])
         logger.info("CLI launched successfully in new window")
 
-    def launch_cli_ubuntu(self):
+    def launch_cli_ubuntu(self, venv_path, cli_py_path):
         """
         Launches MD-CLI in the same terminal screen
         """
+        cli_py = Path(cli_py_path).expanduser().resolve()
+        venv_py = Path(venv_path).expanduser().resolve() / "bin" / "python"
+
         process = subprocess.Popen(
-            ["moondream", "--repl", "--station"],
+            [venv_py, cli_py, "--repl", "--station"],
             stdin=sys.stdin,
             stdout=sys.stdout,
             stderr=sys.stderr,

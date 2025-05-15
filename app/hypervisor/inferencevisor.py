@@ -63,13 +63,13 @@ class InferenceVisor:
         logger.debug(f"Looking for inference bootstrap at: {bootstrap_path}")
 
         if not os.path.exists(bootstrap_path):
-            print(f"Inference client {version} not found, downloading...")
-            if not self._download_inference_client(version):
-                self.status = "boot failed"
-                return {
-                    "status": "error",
-                    "message": f"Failed to download inference client {version}",
-                }
+            with Spinner("Downloading Inference Client..."):
+                if not self._download_inference_client(version):
+                    self.status = "boot failed"
+                    return {
+                        "status": "error",
+                        "message": f"Failed to download inference client {version}",
+                    }
 
         try:
             logger.debug(f"Setting executable permissions on {bootstrap_path}")
@@ -141,7 +141,6 @@ class InferenceVisor:
                     # Wait before checking again
                     time.sleep(3)
 
-            print(f"Inference server ready with model: {self.config.active_model}")
             self.status = "ok"
             return {
                 "status": "ok",
