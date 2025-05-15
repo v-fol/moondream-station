@@ -149,6 +149,7 @@ class MoondreamREPL:
                     print("  Use 'admin update --confirm' to install updates")
 
         except Exception as e:
+            print("\n⚠️ Ensure Moondream Station is running.")
             # On first boot sometime CLI boots before MDS
             # print(f"\nWarning: Could not connect to server: {e}")
             # print("Some commands may not work until server connection is established.")

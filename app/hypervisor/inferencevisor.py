@@ -166,7 +166,7 @@ class InferenceVisor:
                 self.process.wait(timeout=5)
                 print("terminated process")
             except subprocess.TimeoutExpired:
-                logger.warning("Process did not terminate gracefully, killing...")
+                logger.debug("Process did not terminate gracefully, killing...")
                 self.process.kill()
             self.process = None
         self.status = "off"
@@ -447,7 +447,7 @@ class InferenceVisor:
         """
         logger.info("Shutting down inference server")
         try:
-            print("starting shutdown in infvisor")
+            logger.debug("starting shutdown in infvisor")
             self._kill_process()
             return {"status": "ok", "message": "Inference server shutdown complete"}
         except Exception as e:

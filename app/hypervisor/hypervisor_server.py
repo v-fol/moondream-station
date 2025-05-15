@@ -61,7 +61,11 @@ async def lifespan(app: FastAPI):
     yield
     # Cleanup on shutdown
     logger.info("Moondream Hypervisor server shutting down")
-    app.state.hypervisor.shutdown()
+    try:
+        app.state.hypervisor.shutdown()
+    except Exception as e:
+        logger.error(f"Error during hypervisor shutdown: {e}")
+        # Continue with shutdown process even if there was an error
 
 
 app = FastAPI(
@@ -420,16 +424,14 @@ async def shutdown_server(
     async def shutdown_background():
         # Give time for the response to be sent
         await asyncio.sleep(1)
-        # Perform hypervisor shutdown
+        # Perform hypervisor shutdown which no longer calls sys.exit()
         hypervisor.shutdown()
-        # Stop the FastAPI server
+        # Get the server that's running this app
         for task in asyncio.all_tasks():
             if task is not asyncio.current_task():
                 task.cancel()
-        # Exit the process
-        import sys
-
-        sys.exit(0)
+        # Signal to uvicorn to stop gracefully
+        os._exit(0)
 
     # Schedule the background task
     asyncio.create_task(shutdown_background())

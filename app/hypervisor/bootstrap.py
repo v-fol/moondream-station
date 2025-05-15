@@ -26,7 +26,7 @@ else:
     sys.exit(f"Only macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
 
 PYTHON_VERSION = "3.10"
-BOOTSTRAP_VERSION = "v0.0.2"
+BOOTSTRAP_VERSION = "v0.0.1"
 HYPERVISOR_TAR_URL = (
     "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/hypervisor.tar.gz"
 )

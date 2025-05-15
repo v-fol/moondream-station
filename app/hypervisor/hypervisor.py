@@ -295,7 +295,7 @@ class Hypervisor:
         """
         Shutdown the hypervisor and all components.
 
-        Shuts down the inference server and exits the process.
+        Shuts down the inference server and prepares for process termination.
         """
         logger.info("Shutting down hypervisor and all components")
         print("Shutting down Moondream Station...")
@@ -305,4 +305,5 @@ class Hypervisor:
             logger.debug(f"Inference server shutdown result: {shutdown_result}")
 
         self.status = "off"
-        sys.exit(0)
+        # Don't call sys.exit() directly as it interrupts the FastAPI shutdown sequence
+        # The calling process should handle termination after this method completes
