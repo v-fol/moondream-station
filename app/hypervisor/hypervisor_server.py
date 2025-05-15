@@ -36,9 +36,9 @@ def configure_logging() -> logging.Logger:
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt)
 
-    # info+ logs
+    # Only show warnings and above to console
     ch = logging.StreamHandler(sys.stderr)
-    ch.setLevel(logging.INFO)
+    ch.setLevel(logging.WARNING)
     ch.setFormatter(fmt)
 
     logger.addHandler(fh)
