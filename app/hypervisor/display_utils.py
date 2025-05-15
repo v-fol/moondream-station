@@ -30,15 +30,30 @@ RUNNING = r"""
 class Spinner:
     """Shows an animated spinner with a message while a long-running task is executing"""
 
+    # Class variable to track active spinner
+    _active_spinner = None
+    enabled = True
+
     def __init__(self, message="Loading"):
         """Initialize the spinner with a message"""
         self.message = message
         self.spinner = itertools.cycle(["|", "/", "-", "\\"])
         self.running = False
         self.spinner_thread = None
+        self.was_active = False
 
     def start(self):
         """Start the spinner animation"""
+        if not Spinner.enabled:
+            return
+
+        # If there's already an active spinner, don't start a new one
+        if Spinner._active_spinner is not None:
+            self.was_active = False
+            return
+
+        Spinner._active_spinner = self
+        self.was_active = True
         self.running = True
         self.spinner_thread = threading.Thread(target=self._spin)
         self.spinner_thread.daemon = True
@@ -46,11 +61,18 @@ class Spinner:
 
     def stop(self):
         """Stop the spinner animation"""
+        if not self.was_active:
+            return
+
         self.running = False
         if self.spinner_thread:
             self.spinner_thread.join()
         sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r")
         sys.stdout.flush()
+
+        # Clear active spinner reference
+        if Spinner._active_spinner == self:
+            Spinner._active_spinner = None
 
     def _spin(self):
         """Animate the spinner"""

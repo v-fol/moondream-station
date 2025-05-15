@@ -273,10 +273,10 @@ def setup_env_if_needed(
     # Only print minimal setup information to stdout
     print("Setting up Python environment (this may take several minutes)")
 
-    with Spinner("Setting up Python environment..."):
-        embed_dir = setup_miniforge_if_needed(py_versions_dir, python_version, logger)
-        create_venv(venv_dir, embed_dir, logger)
-        install_requirements(venv_dir, logger)
+    # No spinner at this level - inner functions will handle their own spinners
+    embed_dir = setup_miniforge_if_needed(py_versions_dir, python_version, logger)
+    create_venv(venv_dir, embed_dir, logger)
+    install_requirements(venv_dir, logger)
 
     return venv_dir
 
@@ -675,6 +675,9 @@ def main(verbose: bool = False):
         verbose: Whether to print detailed information to console
     """
     start_time = time.time()
+
+    # Configure spinner based on verbosity
+    Spinner.enabled = not verbose
 
     print_banner()
     os.environ["md_ph_k"] = POSTHOG_PROJECT_API_KEY
