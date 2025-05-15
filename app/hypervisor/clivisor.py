@@ -53,8 +53,8 @@ class CLIVisor:
         try:
             if PLATFORM == "macOS":
                 self.launch_cli_mac()
-            # elif PLATFORM == "ubuntu":
-            #     self.launch_cli_ubuntu()
+            elif PLATFORM == "ubuntu":
+                self.launch_cli_ubuntu()
             else:
                 raise ValueError(
                     f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}"
