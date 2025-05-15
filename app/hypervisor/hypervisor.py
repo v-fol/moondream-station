@@ -50,6 +50,7 @@ class Hypervisor:
         self.status = "initialized"
         logger.debug("Hypervisor initialized")
         self.posthog_capture("boot")
+        Spinner.show_animation = not PLATFORM == "macOS"
 
     def check_health(self) -> dict[str, Any]:
         """
