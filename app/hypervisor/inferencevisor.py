@@ -13,10 +13,11 @@ from typing import Union, Dict, Generator, Any, Optional
 
 from config import Config
 from manifest import Manifest
-from misc import download_file
+from misc import download_file, check_platform
 from display_utils import Spinner
 
 logger = logging.getLogger("hypervisor")
+PLATFORM = check_platform()
 
 
 class InferenceVisor:
@@ -186,7 +187,9 @@ class InferenceVisor:
             logger.error(f"No download URL for inference client {version}")
             return False
 
-        url = client_info["url"]
+        url = client_info["url"].replace(
+            "inference.tar.gz", f"inference_{PLATFORM}.tar.gz"
+        )
         download_path = os.path.join(self.base_dir, f"inference_{version}.tar.gz")
         extract_dir = os.path.join(self.inference_dir, version)
 
@@ -194,14 +197,7 @@ class InferenceVisor:
 
         try:
             logger.debug(f"Downloading inference client {version} from {url}")
-
             download_file(url, download_path, logger)
-            # with requests.get(url, stream=True) as r:
-            #     r.raise_for_status()
-            #     with open(download_path, "wb") as f:
-            #         for chunk in r.iter_content(chunk_size=8192):
-            #             f.write(chunk)
-
             logger.debug(f"Extracting to {extract_dir}")
             os.makedirs(extract_dir, exist_ok=True)
 

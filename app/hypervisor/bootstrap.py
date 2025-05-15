@@ -28,7 +28,7 @@ else:
 PYTHON_VERSION = "3.10"
 BOOTSTRAP_VERSION = "v0.0.1"
 HYPERVISOR_TAR_URL = (
-    "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/hypervisor.tar.gz"
+    f"https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/hypervisor.tar.gz"
 )
 POSTHOG_PROJECT_API_KEY = "phc_8S71qk0L1WlphzX448tekgbnS1ut266W4J48k9kW0Cx"
 SSL_CERT_FILE = "SSL_CERT_FILE"
@@ -498,7 +498,9 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
             manifest = json.load(f)
 
         bootstrap_info = manifest.get("current_bootstrap", {})
-        bootstrap_url = bootstrap_info.get("url")
+        bootstrap_url = bootstrap_info.get("url").replace(
+            "moondream_station.tar.gz", f"moondream_station_{PLATFORM}.tar.gz"
+        )
         bootstrap_version = bootstrap_info.get("version")
 
         if not bootstrap_url:

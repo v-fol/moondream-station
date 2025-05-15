@@ -17,7 +17,7 @@ from misc import download_file, get_app_dir, check_platform
 from display_utils import Spinner
 
 logger = logging.getLogger("hypervisor")
-HYPERVISOR_VERSION = "v0.0.1"
+HYPERVISOR_VERSION = "v0.0.2"
 PLATFORM = check_platform()
 
 
