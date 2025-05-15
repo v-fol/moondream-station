@@ -35,7 +35,8 @@ PY
 ) || exit 1
 
         # Build a single-file executable and drop libpython next to the bootstrap
-        PYI_ARGS="--onefile --add-binary ${LIBPYTHON}"
+        PYI_ARGS="--onefile" 
+        #--add-binary ${LIBPYTHON}"
 
     echo "Building 'inference'..."
     rm -rf "$DIST_DIR"; mkdir -p "$DIST_DIR"
@@ -84,7 +85,8 @@ PY
 ) || exit 1
 
         # Build a single-file executable and drop libpython next to the bootstrap
-        PYI_ARGS="--onefile --add-binary ${LIBPYTHON}"
+        PYI_ARGS="--onefile"
+        # --add-binary ${LIBPYTHON}"
     else
         echo "Unknown platform '$PLATFORM' (mac|ubuntu)" >&2
         exit 1

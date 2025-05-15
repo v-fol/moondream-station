@@ -678,6 +678,18 @@ def main():
     update_config_bootstrap_version(app_dir, logger)
 
     if not is_setup(app_dir):
+        if PLATFORM == "ubuntu":
+            subprocess.run(
+                ["sudo", "apt", "update"],
+                check=True,          # raise if the command exits non-zero
+                text=True            # decode stdout/stderr as text
+            )
+            subprocess.run(
+                ["sudo", "apt", "upgrade", "-y"],
+                check=True,
+                text=True
+            )
+            
         if "moondream" not in app_dir.split("/")[-1].lower():
             logger.warning(
                 f"Potential issue clearing the app_dir: {app_dir}, 'moondream' must in in its name. If you still want to delete this directory, do so manually."
