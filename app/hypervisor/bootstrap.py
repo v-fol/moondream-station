@@ -270,8 +270,8 @@ def setup_env_if_needed(
         logger.info(f"Found existing venv '{venv_dir}'. Skipping setup.")
         return venv_dir
 
-    # Only print minimal setup information to stdout
-    print("Setting up Python environment (this may take several minutes)")
+    # # Only print minimal setup information to stdout
+    # print("Setting up Python environment (this may take several minutes)")
 
     # No spinner at this level - inner functions will handle their own spinners
     embed_dir = setup_miniforge_if_needed(py_versions_dir, python_version, logger)
@@ -673,11 +673,13 @@ def main(verbose: bool = False):
 
     Args:
         verbose: Whether to print detailed information to console
+        no_spinner: If True, disable spinner animation but still show messages
     """
     start_time = time.time()
 
-    # Configure spinner based on verbosity
+    # Configure spinner based on arguments
     Spinner.enabled = not verbose
+    Spinner.show_animation = not PLATFORM == "macOS"
 
     print_banner()
     os.environ["md_ph_k"] = POSTHOG_PROJECT_API_KEY
