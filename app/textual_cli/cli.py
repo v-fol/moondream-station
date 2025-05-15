@@ -1,136 +1,138 @@
-from textual import events, on
-from textual.app import App, ComposeResult
-from textual.containers import (
-    Container,
-    Horizontal,
-    Vertical,
-    ScrollableContainer,
-    VerticalGroup,
-)
-from textual.widgets import (
-    Header,
-    Footer,
-    Static,
-    Button,
-    Select,
-    Label,
-    RichLog,
-    Input,
-)
-from textual.screen import Screen
-from textual.message import Message
+import sys
+import os
+import moondream as md
+from typing import Dict, Optional
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+hypervisor_dir = os.path.join(parent_dir, "hypervisor")
+
+# Add parent directory to module search path to allow direct script execution
+# When unpacked on machine, moondream_cli & inference become subdirectories of .../Library/MoondreamStation
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+if hypervisor_dir not in sys.path:
+    sys.path.insert(0, hypervisor_dir)
+
+from config import Config
+
+from moondream_cli.commands.inference_commands import InferenceCommands
+from moondream_cli.commands.admin_commands import AdminCommands
+
+VERSION = "v0.0.1"
 
 
-class KeyLogger(RichLog):
-    def on_key(self, event: events.Key) -> None:
-        self.write(event)
+class HypervisorCLI:
+    """Command-line interface for the Moondream Hypervisor Server."""
 
+    # Version information
 
-class CaptionInput(Static):
-    def compose(self):
-        yield Input(placeholder="Image Path", id="image_path_field")
+    def __init__(self, server_url: str = "http://localhost:2020"):
+        """Initialize the CLI with the server URL."""
+        self.server_url = server_url
+        self.headers = {"Content-Type": "application/json"}
+        # Initialize the moondream client for vision-language calls
+        self.vl_client = md.vl(endpoint=f"{server_url}/v1")
+        self.config = Config()
+        self.config.active_cli = VERSION
 
+        # Initialize command modules
+        self.inference_commands = InferenceCommands(self.vl_client)
+        self.admin_commands = AdminCommands(self.server_url, self.headers)
 
-class QueryInput(Static):
-    def compose(self):
-        yield Input(placeholder="Image Path", id="image_path_field")
-        yield Input(placeholder="Prompt", id="prompt_field")
+    # ==================== Image Commands ====================
 
+    def caption(
+        self,
+        image_path: str,
+        length: str = "normal",
+        stream: bool = True,
+        max_tokens: int = 500,
+    ) -> None:
+        """Generate a caption for an image."""
+        self.inference_commands.caption(image_path, length, stream, max_tokens)
 
-class DetectInput(Static):
-    def compose(self):
-        yield Input(placeholder="Image Path", id="image_path_field")
-        yield Input(placeholder="Detect", id="prompt_field")
+    def query(
+        self, image_path: str, question: str, stream: bool = True, max_tokens: int = 500
+    ) -> None:
+        """Answer a visual query about an image."""
+        self.inference_commands.query(image_path, question, stream, max_tokens)
 
+    def detect(self, image_path: str, obj: str) -> None:
+        """Detect objects in an image."""
+        self.inference_commands.detect(image_path, obj)
 
-class PointInput(Static):
-    def compose(self):
-        yield Input(placeholder="Image Path", id="image_path_field")
-        yield Input(placeholder="Point", id="prompt_field")
+    def point(self, image_path: str, obj: str) -> None:
+        """Find points corresponding to an object in an image."""
+        self.inference_commands.point(image_path, obj)
 
+    # ==================== Admin Commands ====================
 
-class Infer(Static):
-    def compose(self) -> ComposeResult:
-        with Horizontal(
-            id="capibility_horizontal_group",
-        ):
-            yield Button("Caption", id="caption_button", variant="primary")
-            yield Button("Query", id="query_button")
-            yield Button("Detect", id="detect_button")
-            yield Button("Point", id="point_button")
-        with Container(id="capibility_input_container", classes="bottom"):
-            yield CaptionInput()
+    def status(self, silent=False) -> Optional[Dict[str, str]]:
+        """Check the status of the hypervisor and inference server."""
+        if not silent:
+            print("Checking Moondream Station status...")
 
-    @on(Button.Pressed, "#caption_button")
-    def handle_caption_button(self, event: Button.Pressed) -> None:
-        self.query_one("#caption_button").variant = "primary"
-        self.query_one("#query_button").variant = "default"
-        self.query_one("#detect_button").variant = "default"
-        self.query_one("#point_button").variant = "default"
+        result = self.admin_commands._make_request("GET", "/admin/status")
 
-        # Replace the content in the input container
-        input_container = self.query_one("#capibility_input_container")
-        input_container.remove_children()
-        input_container.mount(CaptionInput())
+        if result and not silent:
+            print(f"Hypervisor status: {result.get('hypervisor', 'unknown')}")
+            print(f"Inference server status: {result.get('inference', 'unknown')}")
+            return result
+        return result
 
-    @on(Button.Pressed, "#query_button")
-    def handle_query_button(self, event: Button.Pressed) -> None:
-        self.query_one("#query_button").variant = "primary"
-        self.query_one("#caption_button").variant = "default"
-        self.query_one("#detect_button").variant = "default"
-        self.query_one("#point_button").variant = "default"
+    def health(self) -> None:
+        """Check the health of all components."""
+        self.admin_commands.health()
 
-        # Replace the content in the input container
-        input_container = self.query_one("#capibility_input_container")
-        input_container.remove_children()
-        input_container.mount(QueryInput())
+    def get_config(self) -> None:
+        """Get the current server configuration."""
+        self.admin_commands.get_config()
 
-    @on(Button.Pressed, "#detect_button")
-    def handle_detect_button(self, event: Button.Pressed) -> None:
-        self.query_one("#detect_button").variant = "default"
-        self.query_one("#caption_button").variant = "default"
-        self.query_one("#detect_button").variant = "primary"
-        self.query_one("#point_button").variant = "default"
+    def set_inference_url(self, url: str) -> None:
+        """Set the URL for the inference server."""
+        self.admin_commands.set_inference_url(url)
 
-        # Replace the content in the input container
-        input_container = self.query_one("#capibility_input_container")
-        input_container.remove_children()
-        input_container.mount(DetectInput())
+    def set_model(self, model: str, confirm: bool = False) -> None:
+        """Set the active model for the inference server."""
+        self.admin_commands.set_model(model, confirm)
 
-    @on(Button.Pressed, "#point_button")
-    def handle_point_button(self, event: Button.Pressed) -> None:
-        self.query_one("#detect_button").variant = "default"
-        self.query_one("#caption_button").variant = "default"
-        self.query_one("#detect_button").variant = "default"
-        self.query_one("#point_button").variant = "primary"
+    def update_hypervisor(self, confirm: bool = False) -> None:
+        """Update the hypervisor to the latest version."""
+        self.admin_commands.update_hypervisor(confirm)
 
-        # Replace the content in the input container
-        input_container = self.query_one("#capibility_input_container")
-        input_container.remove_children()
-        input_container.mount(PointInput())
+    def update_bootstrap(self, confirm: bool = False) -> None:
+        """Update the bootstrap to the latest version."""
+        self.admin_commands.update_bootstrap(confirm)
 
+    def update_manifest(self) -> None:
+        """Update the server manifest from a remote source."""
+        self.admin_commands.update_manifest()
 
-class MainPannel(Static):
-    def compose(self):
-        with Vertical(id="infer_vertical_section"):
-            yield Infer(id="infer_panel")
+    def get_models(self) -> None:
+        """Get the list of available models."""
+        self.admin_commands.get_models()
 
+    def shutdown(self) -> None:
+        """Shutdown the hypervisor server."""
+        self.admin_commands.shutdown()
 
-class MoondreamCLI(App):
-    CSS_PATH = "cli.tcss"
-    TITLE = "Moondream Station"
+    def check_updates(self) -> None:
+        """Check for updates to various components."""
+        self.admin_commands.check_updates()
 
-    def compose(self):
-        yield Header()
+    def update_cli(self, confirm: bool = False) -> None:
+        """Update the CLI to the latest version."""
+        self.admin_commands.update_cli(confirm)
 
-        with Horizontal(id="main-layout"):
-            with Vertical(id="sidebar"):
-                yield Button("💬 Infer", id="infer_button")
-                yield Button("🗄️  Logs", id="logs_button")
-                yield Button("⚙️  Setting", id="setting_button")
-            yield MainPannel(id="main_panel")
+    def update_all(self, confirm: bool = False) -> None:
+        """Update all components that need updating."""
+        self.admin_commands.update_all(confirm)
 
+    def toggle_metrics(self, confirm: bool = False) -> None:
+        """Toggle metric reporting on or off."""
+        self.admin_commands.toggle_metrics(confirm)
 
-if __name__ == "__main__":
-    app = MoondreamCLI()
-    app.run()
+    def reset(self, confirm: bool = False) -> None:
+        """Delete all app data and reset the application."""
+        self.admin_commands.reset(confirm)

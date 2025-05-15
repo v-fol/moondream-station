@@ -1,0 +1,11 @@
+{
+    "active_bootstrap": "",
+    "active_hypervisor": "",
+    "active_inference_client": "",
+    "active_model": "",
+    "active_cli": "v0.0.1",
+    "inference_url": "http://localhost:20200/v1",
+    "ph_h": "https://us.i.posthog.com",
+    "ph_did": "64ae121f-228b-4e7d-ad28-061008e1e4f1",
+    "metrics_reporting": true
+}
