@@ -1,18 +1,17 @@
+from functools import partial
 import os
-import certifi
 import sys
 import time
-import subprocess
-import platform
-import stat
-import logging
-import tarfile
 import json
-import shutil
+import stat
+import tarfile
 import signal
+import logging
 import shlex
-
-from functools import partial
+import platform
+import subprocess
+import certifi
+import shutil
 
 from display_utils import print_banner, Spinner
 from config import DEFAULT_CONFIG
@@ -43,11 +42,12 @@ if PLATFORM == "macOS":
 sys.stdout.reconfigure(line_buffering=True, write_through=True)
 
 
-def configure_logging(log_dir: str) -> logging.Logger:
+def configure_logging(log_dir: str, verbose: bool = False) -> logging.Logger:
     """Configure logging for the bootstrap process.
 
     Args:
         log_dir: Directory where log files will be stored
+        verbose: Whether to print info-level logs to stderr
 
     Returns:
         Logger: Configured logger instance
@@ -65,7 +65,11 @@ def configure_logging(log_dir: str) -> logging.Logger:
 
     # console logs
     ch = logging.StreamHandler(sys.stderr)
-    ch.setLevel(logging.WARNING)
+    # Set console log level based on verbosity
+    if verbose:
+        ch.setLevel(logging.INFO)
+    else:
+        ch.setLevel(logging.WARNING)
     ch.setFormatter(fmt)
 
     logger.addHandler(fh)
@@ -94,14 +98,16 @@ def setup_miniforge_installer(
     os.makedirs(embed_dir, exist_ok=True)
 
     installer_name = os.path.join(embed_dir, "Miniforge.sh")
-    download_file(installer_url, installer_name, logger)
+    with Spinner("Downloading Miniforge installer..."):
+        download_file(installer_url, installer_name, logger)
 
     st = os.stat(installer_name)
     os.chmod(installer_name, st.st_mode | stat.S_IEXEC)
 
     logger.info(f"Running Miniforge installer in {embed_dir}")
-    cmd = [installer_name, "-u", "-b", "-p", os.path.abspath(embed_dir)]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    with Spinner("Installing Miniforge (this may take several minutes)..."):
+        cmd = [installer_name, "-u", "-b", "-p", os.path.abspath(embed_dir)]
+        res = subprocess.run(cmd, capture_output=True, text=True)
     logger.info(f"Miniforge installer return code: {res.returncode}")
     if res.stdout:
         logger.debug(f"Installer stdout:\n{res.stdout}")
@@ -119,8 +125,9 @@ def setup_miniforge_installer(
         raise FileNotFoundError(f"Cannot find conda at {conda_bin}")
 
     logger.info(f"Forcing Miniforge Python to {python_version}")
-    force_cmd = [conda_bin, "install", "-y", f"python={python_version}"]
-    res2 = subprocess.run(force_cmd, capture_output=True, text=True)
+    with Spinner(f"Configuring Python {python_version}..."):
+        force_cmd = [conda_bin, "install", "-y", f"python={python_version}"]
+        res2 = subprocess.run(force_cmd, capture_output=True, text=True)
     logger.info(f"conda install python={python_version} return code: {res2.returncode}")
     if res2.stdout:
         logger.debug(f"Conda python install stdout:\n{res2.stdout}")
@@ -148,8 +155,9 @@ def install_libvips_conda(embed_dir: str, logger: logging.Logger):
         raise FileNotFoundError(f"Cannot find conda at {conda_bin}")
 
     logger.info(f"Installing libvips with conda in {embed_dir}")
-    cmd = [conda_bin, "install", "-y", "conda-forge::libvips"]
-    res = subprocess.run(cmd, capture_output=True, text=True)
+    with Spinner("Installing libvips dependencies..."):
+        cmd = [conda_bin, "install", "-y", "conda-forge::libvips"]
+        res = subprocess.run(cmd, capture_output=True, text=True)
     logger.info(f"Conda install libvips return code: {res.returncode}")
     if res.stdout:
         logger.debug(f"Conda libvips install stdout:\n{res.stdout}")
@@ -230,9 +238,10 @@ def create_venv(venv_dir: str, embed_dir: str, logger: logging.Logger):
         raise FileNotFoundError(f"Cannot find {python_bin}")
 
     logger.info(f"Creating venv at {venv_dir} using {python_bin}")
-    result = subprocess.run(
-        [python_bin, "-m", "venv", venv_dir], capture_output=True, text=True
-    )
+    with Spinner("Creating Python virtual environment..."):
+        result = subprocess.run(
+            [python_bin, "-m", "venv", venv_dir], capture_output=True, text=True
+        )
     logger.info(f"Venv creation return code: {result.returncode}")
     if result.stdout:
         logger.debug(f"Venv creation stdout:\n{result.stdout}")
@@ -261,10 +270,13 @@ def setup_env_if_needed(
         logger.info(f"Found existing venv '{venv_dir}'. Skipping setup.")
         return venv_dir
 
+    # Only print minimal setup information to stdout
     print("Setting up Python environment (this may take several minutes)")
-    embed_dir = setup_miniforge_if_needed(py_versions_dir, python_version, logger)
-    create_venv(venv_dir, embed_dir, logger)
-    install_requirements(venv_dir, logger)
+
+    with Spinner("Setting up Python environment..."):
+        embed_dir = setup_miniforge_if_needed(py_versions_dir, python_version, logger)
+        create_venv(venv_dir, embed_dir, logger)
+        install_requirements(venv_dir, logger)
 
     return venv_dir
 
@@ -281,17 +293,18 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
     """
     requirements_file = "requirements.txt"
     python_bin = os.path.join(venv_dir, "bin", "python")
-    print(f"using {python_bin} to install")
+    logger.info(f"Using {python_bin} to install packages")
     if not os.path.isfile(python_bin):
         raise FileNotFoundError(f"Cannot find {python_bin}")
 
     logger.info("Upgrading pip...")
 
-    res = subprocess.run(
-        [python_bin, "-m", "pip", "install", "--upgrade", "pip"],
-        capture_output=True,
-        text=True,
-    )
+    with Spinner("Upgrading pip..."):
+        res = subprocess.run(
+            [python_bin, "-m", "pip", "install", "--upgrade", "pip"],
+            capture_output=True,
+            text=True,
+        )
     logger.info(f"Pip upgrade return code: {res.returncode}")
     if res.stdout:
         logger.debug(f"Pip upgrade stdout:\n{res.stdout}")
@@ -303,11 +316,12 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
         return
 
     logger.info(f"Installing requirements from {requirements_file}")
-    res = subprocess.run(
-        [python_bin, "-m", "pip", "install", "-U", "-r", requirements_file],
-        capture_output=True,
-        text=True,
-    )
+    with Spinner("Installing Python requirements (this may take several minutes)..."):
+        res = subprocess.run(
+            [python_bin, "-m", "pip", "install", "-U", "-r", requirements_file],
+            capture_output=True,
+            text=True,
+        )
     logger.info(f"Requirements install return code: {res.returncode}")
     if res.stdout:
         logger.debug(f"Requirements install stdout:\n{res.stdout}")
@@ -358,12 +372,17 @@ def run_main_loop(venv_dir: str, app_dir: str, logger: logging.Logger):
             return
 
         logger.info(f"Launching {main_py} via {python_bin}")
-        print(f"Launching {main_py} via {python_bin}")
+        # Minimal output to stdout
+        print(f"Launching Moondream Station...")
 
         proc = subprocess.Popen([python_bin, main_py])
         return_code = proc.wait()
         logger.warning(f"{main_py} exited with code {return_code}; restarting in 5s.")
-        print("return code is", return_code)
+        if return_code != 0:
+            print(
+                f"Moondream Station exited with code {return_code}; restarting in 5 seconds..."
+            )
+
         if return_code == 99:
             update_bootstrap(app_dir, logger)
 
@@ -391,11 +410,13 @@ def download_and_extract_hypervisor(app_dir: str, logger: logging.Logger) -> boo
     tar_path = os.path.join(app_dir, "hypervisor.tar.gz")
 
     try:
-        download_file(HYPERVISOR_TAR_URL, tar_path, logger)
+        with Spinner("Downloading hypervisor package..."):
+            download_file(HYPERVISOR_TAR_URL, tar_path, logger)
 
         logger.info(f"Extracting hypervisor package to {app_dir}")
-        with tarfile.open(tar_path, "r:gz") as tar:
-            tar.extractall(path=app_dir)
+        with Spinner("Extracting hypervisor package..."):
+            with tarfile.open(tar_path, "r:gz") as tar:
+                tar.extractall(path=app_dir)
 
         logger.info("Extraction complete")
         os.remove(tar_path)
@@ -644,11 +665,14 @@ def is_setup(app_dir: str) -> bool:
     return True
 
 
-def main():
+def main(verbose: bool = False):
     """Entry point for Moondream Station.
 
     Handles setup of Python environment, downloads necessary components,
     and launches the hypervisor server loop.
+
+    Args:
+        verbose: Whether to print detailed information to console
     """
     start_time = time.time()
 
@@ -656,7 +680,7 @@ def main():
     os.environ["md_ph_k"] = POSTHOG_PROJECT_API_KEY
 
     app_dir = get_app_dir(PLATFORM)
-    logger = configure_logging(app_dir)
+    logger = configure_logging(app_dir, verbose)
 
     os.chdir(app_dir)
     venv_dir = os.path.join(app_dir, ".venv")
@@ -665,6 +689,8 @@ def main():
     logger.info(f"Platform: {platform.system()} {platform.release()}")
     logger.info(f"Application directory: {app_dir}")
     logger.info("Starting hypervisor bootstrap...")
+    if verbose:
+        print("Starting hypervisor bootstrap...")
 
     try:
         download_and_extract_hypervisor(app_dir, logger)
@@ -681,15 +707,11 @@ def main():
         if PLATFORM == "ubuntu":
             subprocess.run(
                 ["sudo", "apt", "update"],
-                check=True,          # raise if the command exits non-zero
-                text=True            # decode stdout/stderr as text
+                check=True,  # raise if the command exits non-zero
+                text=True,  # decode stdout/stderr as text
             )
-            subprocess.run(
-                ["sudo", "apt", "upgrade", "-y"],
-                check=True,
-                text=True
-            )
-            
+            subprocess.run(["sudo", "apt", "upgrade", "-y"], check=True, text=True)
+
         if "moondream" not in app_dir.split("/")[-1].lower():
             logger.warning(
                 f"Potential issue clearing the app_dir: {app_dir}, 'moondream' must in in its name. If you still want to delete this directory, do so manually."
@@ -705,6 +727,7 @@ def main():
         sys.exit(1)
 
     elapsed_time = time.time() - start_time
+    logger.info(f"Bootup completed in {elapsed_time:.2f} seconds")
     print(f"Bootup completed in {elapsed_time:.2f} seconds")
     print("Starting Moondream Station...\n")
 
@@ -712,4 +735,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Moondream Station Bootstrap")
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Print detailed information to stdout",
+    )
+    args = parser.parse_args()
+
+    main(verbose=args.verbose)
