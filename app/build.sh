@@ -46,6 +46,7 @@ PY
         --hidden-import=zipfile \
         --hidden-import=pyvips \
         --name "$NAME" \
+        --clean \
         --distpath "$DIST_DIR" \
         "$BOOTSTRAP"
 
@@ -110,6 +111,7 @@ PY
         --hidden-import=urllib.request \
         --hidden-import=zipfile \
         --name "$NAME" \
+        --clean \
         --distpath "$DIST_DIR" \
         "$BOOTSTRAP"
 
