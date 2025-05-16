@@ -23,7 +23,7 @@ class MoondreamREPL:
         self, server_url: str = "http://localhost:2020", attached_station: bool = False
     ):
         """Initialize the REPL with a CLI instance."""
-        self.cli = HypervisorCLI(server_url)
+        self.cli = HypervisorCLI(server_url, attached_station=attached_station)
         self.running = True
         self.commands = {
             "help": self.show_help,
@@ -149,7 +149,7 @@ class MoondreamREPL:
                     print("  Use 'admin update --confirm' to install updates")
 
         except Exception as e:
-            print("\n⚠️ Ensure Moondream Station is running.")
+            print("\n ⚠️ Ensure Moondream Station is running.")
             # On first boot sometime CLI boots before MDS
             # print(f"\nWarning: Could not connect to server: {e}")
             # print("Some commands may not work until server connection is established.")

@@ -50,11 +50,16 @@ sleep "$SLEEP_TIME"
 # 3) Replace old target with new target
 echo "[update_bootstrap.sh] Replacing old target…"
 rm -rf "$OLD_EXE_PATH"
-mv "$NEW_EXE_PATH" "$OLD_EXE_PATH"
 
-if { [ "$PLATFORM" = "mac" ] && [ -d "$OLD_EXE_PATH" ]; } ||
-   { [ "$PLATFORM" = "ubuntu" ] && [ -f "$OLD_EXE_PATH" ]; }; then
-  echo "[update_bootstrap.sh] New target successfully installed."
+# Simple move, ensure target directory exists
+echo "[update_bootstrap.sh] Moving from $NEW_EXE_PATH to $OLD_EXE_PATH"
+mkdir -p "$(dirname "$OLD_EXE_PATH")"
+cp -f "$NEW_EXE_PATH" "$OLD_EXE_PATH"
+
+if [ "$PLATFORM" = "mac" ] && [ -d "$OLD_EXE_PATH" ]; then
+  echo "[update_bootstrap.sh] New Mac target successfully installed."
+elif [ "$PLATFORM" = "ubuntu" ] && { [ -f "$OLD_EXE_PATH" ] || [ -d "$OLD_EXE_PATH" ]; }; then
+  echo "[update_bootstrap.sh] New Ubuntu target successfully installed."
 else
   echo "[update_bootstrap.sh] ERROR: Target not found at $OLD_EXE_PATH."
   exit 1
@@ -76,12 +81,39 @@ end tell
 EOF
 
 elif [ "$PLATFORM" = "ubuntu" ]; then
-  if ! command -v gnome-terminal >/dev/null 2>&1; then
-    echo "[update_bootstrap.sh] ERROR: gnome-terminal not found."
-    exit 2
+  # Try multiple terminal emulators for Ubuntu
+  TERMINAL_CMD=""
+  for term in gnome-terminal xterm konsole mate-terminal xfce4-terminal terminator; do
+    if command -v "$term" >/dev/null 2>&1; then
+      TERMINAL_CMD="$term"
+      break
+    fi
+  done
+  
+  if [ -z "$TERMINAL_CMD" ]; then
+    echo "[update_bootstrap.sh] WARNING: No graphical terminal found. Starting executable directly."
+    # Try to run the executable directly
+    chmod +x "$OLD_EXE_PATH"
+    nohup "$OLD_EXE_PATH" > /tmp/moondream_launch.log 2>&1 &
+  else
+    echo "[update_bootstrap.sh] Using terminal: $TERMINAL_CMD"
+    # Launch with the found terminal
+    case "$TERMINAL_CMD" in
+      "gnome-terminal")
+        $TERMINAL_CMD -- bash -c "\"$OLD_EXE_PATH\" ; exec bash"
+        ;;
+      "xterm"|"konsole"|"mate-terminal"|"xfce4-terminal")
+        $TERMINAL_CMD -e "\"$OLD_EXE_PATH\" ; exec bash"
+        ;;
+      "terminator")
+        $TERMINAL_CMD -e "bash -c \"$OLD_EXE_PATH\" ; exec bash"
+        ;;
+      *)
+        # Default case, try with common arguments
+        $TERMINAL_CMD -e "bash -c \"$OLD_EXE_PATH\" ; exec bash"
+        ;;
+    esac
   fi
-
-  gnome-terminal -- bash -c "\"$OLD_EXE_PATH\" ; exec bash"
 
 else
   echo "[update_bootstrap.sh] ERROR: Unknown platform '$PLATFORM'."

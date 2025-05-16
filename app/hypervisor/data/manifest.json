@@ -3,7 +3,7 @@
     "manifest_date": "04/20/25",
     "current_bootstrap": {
         "version": "v0.0.1",
-        "url": ""
+        "url": "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/moondream_station.tar.gz"
     },
     "current_cli": {
         "version": "v0.0.1",
