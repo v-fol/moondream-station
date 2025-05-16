@@ -21,13 +21,15 @@ PLATFORM = check_platform()
 if PLATFORM == "macOS":
     MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
 elif PLATFORM == "ubuntu":
-    MINIFORGE_MAC_URL = "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+    MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-Linux-x86_64.sh"
 else:
     sys  # Executable permissions are now handled in the code aboveOnly macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
 
 PYTHON_VERSION = "3.10"
 BOOTSTRAP_VERSION = "v0.0.1"
-HYPERVISOR_TAR_URL = f"https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/hypervisor_ubuntu.tar.gz"
+HYPERVISOR_TAR_URL = (
+    f"https://depot.moondream.ai/station/md_station_hypervisor_ubuntu.tar.gz"
+)
 POSTHOG_PROJECT_API_KEY = "phc_8S71qk0L1WlphzX448tekgbnS1ut266W4J48k9kW0Cx"
 SSL_CERT_FILE = "SSL_CERT_FILE"
 
