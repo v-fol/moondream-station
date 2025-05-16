@@ -4,11 +4,10 @@ import logging
 
 from typing import Dict, Any, Optional, List
 
-from misc import parse_version, parse_revision, download_file
+from misc import parse_version, parse_revision, download_file, check_platform
 
-MANIFEST_URL = (
-    "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/manifest.json"
-)
+PLATFORM = check_platform()
+MANIFEST_URL = "https://moondream-server-assets-dev.s3.us-west-2.amazonaws.com/manifest_ubuntu.json"
 MODEL_SIZE = "2b"
 
 

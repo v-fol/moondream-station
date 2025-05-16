@@ -187,9 +187,7 @@ class InferenceVisor:
             logger.error(f"No download URL for inference client {version}")
             return False
 
-        url = client_info["url"].replace(
-            "inference.tar.gz", f"inference_{PLATFORM}.tar.gz"
-        )
+        url = client_info["url"]
         download_path = os.path.join(self.base_dir, f"inference_{version}.tar.gz")
         extract_dir = os.path.join(self.inference_dir, version)
 
