@@ -15,11 +15,20 @@ def parse_version(version: str) -> tuple[int, ...]:
 
 
 def parse_revision(revision: str) -> tuple[int, ...]:
+    """Extract integer components from a revision string.
+
+    This helper gracefully handles revisions that contain alphabetic
+    prefixes/suffixes such as ``2025-04-14-4bit`` or ``4bit-2025-04-14``.
+    Any numeric sequences found in the string are returned as a tuple of
+    integers.  If no digits are found, ``(0,)`` is returned so that the
+    value can still participate in comparisons.
     """
-    Convert each component of a revision str to int.
-    E.g. '2025-04-14' → (2025, 4, 14)
-    """
-    return tuple(int(part) for part in revision.split("-"))
+    import re
+
+    numeric_parts = re.findall(r"\d+", revision)
+    if not numeric_parts:
+        return (0,)
+    return tuple(int(part) for part in numeric_parts)
 
 
 def download_file(url, out_path, logger):
