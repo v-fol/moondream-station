@@ -96,9 +96,33 @@ class Manifest:
         models_dict = self.models
         if not models_dict:
             return None
+        # Group revisions by their numeric components
+        grouped = {}
+        for rev in models_dict.keys():
+            numeric = parse_revision(rev)
+            grouped.setdefault(numeric, []).append(rev)
 
-        revision = max(models_dict.keys(), key=parse_revision)
-        return self.get_model(revision)
+        # Determine the numerically latest revision
+        latest_numeric = max(grouped.keys())
+        candidates = grouped[latest_numeric]
+
+        # Prefer a revision containing "4bit" when multiple revisions share the
+        # same numeric value. Otherwise favour the revision without alphabetic
+        # characters.
+        chosen = None
+        for rev in candidates:
+            if "4bit" in rev:
+                chosen = rev
+                break
+        if not chosen:
+            for rev in candidates:
+                if all(c.isdigit() or c == "-" for c in rev):
+                    chosen = rev
+                    break
+        if not chosen:
+            chosen = candidates[0]
+
+        return self.get_model(chosen)
 
     def get_inference_client(self, version: str) -> Optional[Dict[str, str]]:
         return self.data.get("inference_clients", {}).get(version, None)
