@@ -2,6 +2,7 @@ import platform
 import urllib.request
 import os
 from pathlib import Path
+import shutil
 
 
 def parse_version(version: str) -> tuple[int, ...]:
@@ -17,11 +18,10 @@ def parse_version(version: str) -> tuple[int, ...]:
 def parse_revision(revision: str) -> tuple[int, ...]:
     """Extract integer components from a revision string.
 
-    This helper gracefully handles revisions that contain alphabetic
-    prefixes/suffixes such as ``2025-04-14-4bit`` or ``4bit-2025-04-14``.
-    Any numeric sequences found in the string are returned as a tuple of
-    integers.  If no digits are found, ``(0,)`` is returned so that the
-    value can still participate in comparisons.
+    Works with revision names that include alphabetic prefixes or
+    suffixes (e.g. ``2025-04-14-4bit``). Numeric sequences are extracted
+    and converted to integers. If no digits are present, ``(0,)`` is
+    returned to allow safe comparisons.
     """
     import re
 
@@ -64,9 +64,10 @@ def check_platform() -> str:
 
 
 def get_app_dir(platform: str = None) -> str:
+    """Get the application support directory for Moondream Station."""
     if platform is None:
         platform = check_platform()
-    """Get the application support directory for Moondream Station."""
+
     if platform == "macOS":
         app_dir = Path.home() / "Library"
     elif platform == "ubuntu":

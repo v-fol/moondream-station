@@ -17,10 +17,11 @@ from starlette.background import BackgroundTask
 
 from hypervisor import Hypervisor
 from display_utils import RUNNING
+from misc import get_app_dir
 
 
 def configure_logging() -> logging.Logger:
-    app_dir = os.path.join(os.path.expanduser("~"), "Library", "MoondreamStation")
+    app_dir = get_app_dir()
 
     logger = logging.getLogger("hypervisor")
     logger.setLevel(logging.DEBUG)
@@ -35,9 +36,9 @@ def configure_logging() -> logging.Logger:
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(fmt)
 
-    # info+ logs
+    # Only show warnings and above to console
     ch = logging.StreamHandler(sys.stderr)
-    ch.setLevel(logging.INFO)
+    ch.setLevel(logging.WARNING)
     ch.setFormatter(fmt)
 
     logger.addHandler(fh)
@@ -60,7 +61,11 @@ async def lifespan(app: FastAPI):
     yield
     # Cleanup on shutdown
     logger.info("Moondream Hypervisor server shutting down")
-    app.state.hypervisor.shutdown()
+    try:
+        app.state.hypervisor.shutdown()
+    except Exception as e:
+        logger.error(f"Error during hypervisor shutdown: {e}")
+        # Continue with shutdown process even if there was an error
 
 
 app = FastAPI(
@@ -419,16 +424,14 @@ async def shutdown_server(
     async def shutdown_background():
         # Give time for the response to be sent
         await asyncio.sleep(1)
-        # Perform hypervisor shutdown
+        # Perform hypervisor shutdown which no longer calls sys.exit()
         hypervisor.shutdown()
-        # Stop the FastAPI server
+        # Get the server that's running this app
         for task in asyncio.all_tasks():
             if task is not asyncio.current_task():
                 task.cancel()
-        # Exit the process
-        import sys
-
-        sys.exit(0)
+        # Signal to uvicorn to stop gracefully
+        os._exit(0)
 
     # Schedule the background task
     asyncio.create_task(shutdown_background())
@@ -454,9 +457,7 @@ def main():
     logger.info(f"Starting hypervisor server on port: {args.port}")
     logger.info(f"Using inference server at: {args.inference_url}")
 
-    print(RUNNING)
     print(f"Moondream Station is running on http://localhost:{args.port}/v1")
-    print("\n")
 
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="warning")
 

@@ -28,7 +28,7 @@ class Config:
 
     def load(self) -> Dict[str, Any]:
         try:
-            if os.path.isfile(self.path):
+            if os.path.isfile(self.path): 
                 with open(self.path, "r") as f:
                     self.data = json.load(f)
             else:

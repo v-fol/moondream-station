@@ -13,10 +13,12 @@ from inferencevisor import InferenceVisor
 from clivisor import CLIVisor
 from manifest import Manifest
 from config import Config
-from misc import download_file
+from misc import download_file, get_app_dir, check_platform
+from display_utils import Spinner
 
 logger = logging.getLogger("hypervisor")
 HYPERVISOR_VERSION = "v0.0.1"
+PLATFORM = check_platform()
 
 
 class Hypervisor:
@@ -35,6 +37,8 @@ class Hypervisor:
         self.inferencevisor = InferenceVisor(self.config, self.manifest)
         self.clivisor = CLIVisor(self.config, self.manifest)
 
+        self.app_dir = get_app_dir(PLATFORM)
+
         self.posthog = None
         if md_ph_k := os.environ.get("md_ph_k"):
             self.posthog = Posthog(
@@ -46,6 +50,7 @@ class Hypervisor:
         self.status = "initialized"
         logger.debug("Hypervisor initialized")
         self.posthog_capture("boot")
+        Spinner.show_animation = not PLATFORM == "macOS"
 
     def check_health(self) -> dict[str, Any]:
         """
@@ -84,12 +89,13 @@ class Hypervisor:
         Returns:
             dict: Update status for bootstrap, hypervisor, model, and CLI
         """
-        self.manifest.update()
-        ret_value = {}
-        ret_value["bootstrap"] = self.check_for_bootstrap_update(False)
-        ret_value["hypervisor"] = self.check_for_updates(False)
-        ret_value["model"] = self.inferencevisor.check_for_model_updates(False)
-        ret_value["cli"] = self.clivisor.check_for_update(False)
+        with Spinner("Checking for updates..."):
+            self.manifest.update()
+            ret_value = {}
+            ret_value["bootstrap"] = self.check_for_bootstrap_update(False)
+            ret_value["hypervisor"] = self.check_for_updates(False)
+            ret_value["model"] = self.inferencevisor.check_for_model_updates(False)
+            ret_value["cli"] = self.clivisor.check_for_update(False)
         return ret_value
 
     def check_for_updates(self, update_manifest: bool = True):
@@ -142,10 +148,15 @@ class Hypervisor:
         to allow bootstrap to restart with the new version.
         """
         self.status = "updating hypervisor"
-        update_status = self.check_for_updates()
+
+        with Spinner("Checking for updates..."):
+            update_status = self.check_for_updates()
+
         if not update_status["ood"]:
             print("Hypervisor is already up to date.")
             return
+
+        print(f"Updating hypervisor to version {update_status['version']}...")
         self._download_and_extract_hypervisor(self.manifest.current_hypervisor["url"])
         self.shutdown()  # Bootstrap should restart hypervisor
 
@@ -169,11 +180,13 @@ class Hypervisor:
         tar_path = os.path.join(self.app_dir, "hypervisor.tar.gz")
 
         try:
-            download_file(url, tar_path, logger)
+            with Spinner("Downloading hypervisor package..."):
+                download_file(url, tar_path, logger)
 
             logger.debug(f"Extracting hypervisor package to {self.app_dir}")
-            with tarfile.open(tar_path, "r:gz") as tar:
-                tar.extractall(path=self.app_dir)
+            with Spinner("Extracting hypervisor package..."):
+                with tarfile.open(tar_path, "r:gz") as tar:
+                    tar.extractall(path=self.app_dir)
 
             logger.debug("Extraction complete")
             os.remove(tar_path)
@@ -193,27 +206,24 @@ class Hypervisor:
         Exits with code 99, which signals the bootstrap to check for updates.
         """
         self.status = "updating bootstrap"
-        update_status = self.check_for_bootstrap_update()
+
+        with Spinner("Checking for bootstrap updates..."):
+            update_status = self.check_for_bootstrap_update()
+
         if not update_status["ood"]:
             print("Bootstrap is already up to date.")
             self.status = "ok"
             return
 
-        shutdown_result = self.inferencevisor.shutdown()
-        logger.info(f"Inference server shutdown result: {shutdown_result}")
-        print("Hypervisor exiting 99")
+        print(f"Updating bootstrap to version {update_status['version']}...")
+        with Spinner("Shutting down inference server..."):
+            shutdown_result = self.inferencevisor.shutdown()
+            logger.debug(f"Inference server shutdown result: {shutdown_result}")
+
+        print("Hypervisor exiting with code 99 to trigger bootstrap update")
         sys.exit(99)
 
     # -------------------- Admin --------------------
-    @property
-    def app_dir(self):
-        """
-        Get the application directory path.
-
-        Returns:
-            str: Path to the Moondream Station application directory
-        """
-        return os.path.join(os.path.expanduser("~"), "Library", "MoondreamStation")
 
     def posthog_capture(
         self, event: str, properties: Optional[dict[str, Any]] = None
@@ -247,8 +257,11 @@ class Hypervisor:
         Attempts to delete the app directory and then shuts down the hypervisor.
         """
         try:
-            subprocess.run(f"rm -rf {self.app_dir}", shell=True, check=True)
-            logger.info(f"Reset app_dir: {self.app_dir}")
+            with Spinner(f"Resetting application data..."):
+                subprocess.run(f"rm -rf {self.app_dir}", shell=True, check=True)
+                logger.info(f"Reset app_dir: {self.app_dir}")
+
+            print("Reset complete. Shutting down...")
             self.shutdown()
         except subprocess.CalledProcessError as e:
             err_msg = (e.stderr or e.stdout or "").strip()
@@ -270,20 +283,28 @@ class Hypervisor:
 
         Initializes the CLI, inference server, and loads configuration.
         """
-        self.clivisor.boot()
-        self.inferencevisor.boot()
-        self.config.load()
+        with Spinner("Starting Inference Server..."):
+            self.inferencevisor.boot()
+
+        with Spinner("Loading configuration..."):
+            self.config.load()
+
+        with Spinner("Starting CLI..."):
+            self.clivisor.boot()
 
     def shutdown(self):
         """
         Shutdown the hypervisor and all components.
 
-        Shuts down the inference server and exits the process.
+        Shuts down the inference server and prepares for process termination.
         """
         logger.info("Shutting down hypervisor and all components")
+        print("Shutting down Moondream Station...")
 
-        shutdown_result = self.inferencevisor.shutdown()
-        logger.info(f"Inference server shutdown result: {shutdown_result}")
+        with Spinner("Shutting down inference server..."):
+            shutdown_result = self.inferencevisor.shutdown()
+            logger.debug(f"Inference server shutdown result: {shutdown_result}")
 
         self.status = "off"
-        sys.exit(0)
+        # Don't call sys.exit() directly as it interrupts the FastAPI shutdown sequence
+        # The calling process should handle termination after this method completes

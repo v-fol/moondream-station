@@ -1,13 +1,52 @@
 #!/bin/bash
 
-DOWNLOAD_URL="https://depot.moondream.ai/station/md_station.tar.gz"
-DOWNLOAD_DIR="$HOME/Downloads"
-DOWNLOAD_PATH="$DOWNLOAD_DIR/moondream_station.tar.gz"
-APPLICATIONS_DIR="/Applications"
-FINAL_DOWNLOAD_DIR="$DOWNLOAD_DIR/Moondream Station"
+# Detect the operating system
+OS=$(uname -s)
 
-echo "Downloading Moondream Station..."
-curl -# -L "$DOWNLOAD_URL" -o "$DOWNLOAD_PATH"
+# Set download URLs for Mac and Ubuntu
+DOWNLOAD_URL_MAC="https://depot.moondream.ai/station/md_station.tar.gz"
+DOWNLOAD_URL_UBUNTU="https://depot.moondream.ai/station/md_station_ubuntu.tar.gz"
+
+if [ "$OS" = "Linux" ]; then
+    echo "Ubuntu detected. Installing Moondream Station for Ubuntu..."
+    DOWNLOAD_URL="$DOWNLOAD_URL_UBUNTU"
+    DOWNLOAD_PATH="./md_station_ubuntu.tar.gz"
+    
+    echo "Downloading Moondream Station..."
+    curl -# -L "$DOWNLOAD_URL" -o "$DOWNLOAD_PATH"
+    
+    if [ $? -ne 0 ]; then
+        echo "Download failed. Please check your internet connection and try again."
+        exit 1
+    fi
+    
+    echo "Download complete: $DOWNLOAD_PATH"
+    
+    echo "Extracting files..."
+    tar -xzf "$DOWNLOAD_PATH"
+    
+    if [ $? -ne 0 ]; then
+        echo "Extraction failed."
+        exit 1
+    fi
+    
+    # Clean up
+    echo "Cleaning up temporary files..."
+    rm -f "$DOWNLOAD_PATH"
+    
+    echo "Moondream Station has been successfully installed to the current directory."
+    echo "Installation complete! Run Moondream Station to launch the app."
+    exit 0
+else
+    # Mac OS X installation path
+    DOWNLOAD_URL="$DOWNLOAD_URL_MAC"
+    DOWNLOAD_DIR="$HOME/Downloads"
+    DOWNLOAD_PATH="$DOWNLOAD_DIR/moondream_station.tar.gz"
+    APPLICATIONS_DIR="/Applications"
+    FINAL_DOWNLOAD_DIR="$DOWNLOAD_DIR/Moondream Station"
+    
+    echo "Downloading Moondream Station..."
+    curl -# -L "$DOWNLOAD_URL" -o "$DOWNLOAD_PATH"
 
 if [ $? -ne 0 ]; then
     echo "Download failed. Please check your internet connection and try again."
@@ -112,3 +151,4 @@ echo "Opening the directory containing Moondream Station..."
 open "$INSTALL_DIR"
 
 echo "Installation complete! Double-click Moondream Station to launch the app."
+fi

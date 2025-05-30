@@ -1,16 +1,19 @@
 import logging
 import os
+import sys
 import tarfile
 from pathlib import Path
 import os, stat, textwrap
 import subprocess
 import shutil
+import shlex
 
 from config import Config
 from manifest import Manifest
-from misc import download_file
+from misc import download_file, check_platform
 
 logger = logging.getLogger("hypervisor")
+PLATFORM = check_platform()
 
 
 class CLIVisor:
@@ -38,23 +41,60 @@ class CLIVisor:
                 os.path.join(self.base_dir, ".venv"),
             )
 
+        install_moondream_cli(
+            cli_path,
+            os.path.join(self.base_dir, ".venv"),
+        )
+
         # Launch CLI in a new terminal window as a non-blocking subprocess
         logger.info("Launching CLI in a new window")
         try:
-            # Create an AppleScript command to open a new Terminal window and run the moondream-cli command
-            applescript = """
-            tell application "Terminal"
-                do script "moondream"
-            end tell
-            """
-            subprocess.Popen(["osascript", "-e", applescript])
-            logger.info("CLI launched successfully in new window")
+            if PLATFORM == "macOS":
+                self.launch_cli_mac()
+            elif PLATFORM == "ubuntu":
+                self.launch_cli_ubuntu(
+                    venv_path=os.path.join(self.base_dir, ".venv"),
+                    cli_py_path=cli_path,
+                )
+            else:
+                raise ValueError(
+                    f"Moondream-cli only supports macOS and Ubuntu, therefore it cannot be launched on {PLATFORM}"
+                )
+
         except Exception as e:
             logger.error(f"Failed to launch CLI in new window: {e}")
 
-        print(
-            "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
+        if PLATFORM == "macOS":
+            print(
+                "\nIf a terminal window with the CLI does not automatically appear, you can launch it by executing 'moondream' in a new window.\n"
+            )
+
+    def launch_cli_mac(self):
+        """Launch the moondream CLI in a new terminal window on macOS."""
+        applescript = """
+        tell application "Terminal"
+            do script "moondream"
+        end tell
+        """
+        subprocess.Popen(["osascript", "-e", applescript])
+        logger.info("CLI launched successfully in new window")
+
+    def launch_cli_ubuntu(self, venv_path, cli_py_path):
+        """
+        Launches MD-CLI in the same terminal screen
+        """
+        cli_py = Path(cli_py_path).expanduser().resolve()
+        venv_py = Path(venv_path).expanduser().resolve() / "bin" / "python"
+
+        process = subprocess.Popen(
+            [venv_py, cli_py, "--repl", "--station"],
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
         )
+
+        logger.debug(f"CLI process started with PID {process.pid}")
+        self.cli_process = process
 
     def check_for_update(self, update_manifest: bool = True) -> dict:
         """
@@ -103,7 +143,6 @@ class CLIVisor:
         Returns:
             bool: True if download and extraction succeeded
         """
-        print("downloading cli")
         logger.debug(f"Downloading CLI from {url}")
 
         moondream_cli_dir = os.path.join(self.base_dir, "moondream_cli")
@@ -166,8 +205,10 @@ def install_moondream_cli(
     venv_py = Path(venv_path).expanduser().resolve() / "bin" / "python"
 
     if not cli_py.exists():
+        logger.info("CLI not found")
         raise FileNotFoundError(f"CLI file not found: {cli_py}")
     if not venv_py.exists():
+        logger.info("Python not found while trying to install CLI")
         raise FileNotFoundError(f"Python interpreter not found: {venv_py}")
 
     home = Path.home()
@@ -178,23 +219,42 @@ def install_moondream_cli(
     # Script to execute the CLI
     script = textwrap.dedent(
         f"""\
-        #!/bin/sh
+        #!/usr/bin/env sh
         exec "{venv_py}" "{cli_py}" "$@"
-    """
+        """
     )
 
     wrapper.write_text(script)
-    wrapper.chmod(wrapper.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    wrapper.chmod(0o755)
     logger.debug(f"Installed wrapper → {wrapper}")
 
-    # Ensure ~/.local/bin on PATH for zsh + bash (idempotent)
+    # For VS code and some containers, PATH gets over written. Create symlink so the wrapper can still be accessed.
+    if PLATFORM == "ubuntu":
+        try:
+            usr_local = Path("/usr/local/bin") / cli_name
+            if not usr_local.exists():
+                usr_local.symlink_to(wrapper)
+                logger.debug(f"Symlinked {usr_local} → {wrapper}")
+        except Exception as e:
+            logger.debug(f"Could not create /usr/local/bin symlink: {e}")
+
     path_line = 'export PATH="$HOME/.local/bin:$PATH"'
-    for rc in [
-        home / ".zprofile",
-        home / ".zshrc",
-        home / ".bash_profile",
-        home / ".bashrc",
-    ]:
+    if PLATFORM == "macOS":
+        path_files = [
+            home / ".zprofile",
+            home / ".zshrc",
+            home / ".bash_profile",
+            home / ".bashrc",
+        ]
+    else:
+        path_files = [
+            home / ".profile",
+            home / ".bash_profile",
+            home / ".zshrc",
+            home / ".bashrc",
+        ]
+
+    for rc in path_files:
         try:
             if rc.exists():
                 lines = rc.read_text().splitlines()
@@ -206,8 +266,11 @@ def install_moondream_cli(
                         f.write("\n")
                     f.write(path_line + "\n")
                 logger.debug(f"Added PATH line to {rc.name}")
+            else:
+                logger.debug(
+                    f"pathline already in lines for for rc: {rc}, name: {rc.name}"
+                )
         except OSError as e:
             logger.error(f"⚠️  Could not update {rc}: {e}")
-            print(f"⚠️  Could not update {rc}: {e}")
 
     return wrapper
