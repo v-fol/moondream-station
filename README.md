@@ -54,7 +54,7 @@ look under `~/Applications ` or `~/Downloads`
 
 That's it! Moondream Station will automatically set itself up.
 
-> **Note**: Currently only supports **macOS 15+**. Linux and Windows support coming soon.
+> **Note**: Currently only supports **macOS 15+** and **Ubuntu 22+**. Windows support coming soon.
 
 ### Basic Usage
 
