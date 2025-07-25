@@ -3,6 +3,8 @@ import time
 import warnings
 import logging
 import json
+import sys
+import os
 import base64
 
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
@@ -21,11 +23,12 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logging.getLogger("uvicorn").setLevel(logging.ERROR)
 logging.getLogger("pyvips").setLevel(logging.ERROR)
 
+
 VERSION = "v0.0.2"
 
 
 async def lifespan(app: FastAPI):
-    model_name = "vikhyatk/moondream2"
+    model_name = getattr(app.state, "model_id", "vikhyatk/moondream2")
     revision = getattr(app.state, "revision", None)
     app.state.model_service = ModelService(model_name, revision)
     logger.info("Model initialized successfully.")
@@ -138,13 +141,14 @@ async def caption_endpoint(
     model_service: ModelService = Depends(get_model_service),
 ):
     content_type = request.headers.get("content-type", "")
-
+    variant = None
     if "application/json" in content_type:
         body = await request.json()
         image_url = body.get("image_url")
         length = body.get("length", "normal")
         stream = body.get("stream", False)
         settings = body.get("settings", {})
+        variant = body.get("variant")
         if not image_url:
             raise HTTPException(status_code=400, detail="Missing 'image_url' in JSON.")
         image = load_base64_image(image_url)
@@ -171,11 +175,16 @@ async def caption_endpoint(
             length=length,
             stream=True,
             settings=settings,
+            variant=variant,
         )
         return StreamingResponse(event_generator, media_type="text/event-stream")
     else:
         result = process_inference(
-            image, model_service.caption, length=length, settings=settings
+            image,
+            model_service.caption,
+            length=length,
+            settings=settings,
+            variant=variant,
         )
         return JSONResponse({"caption": result["caption"], "request_id": 0})
 
@@ -188,13 +197,15 @@ async def query_endpoint(
     model_service: ModelService = Depends(get_model_service),
 ):
     content_type = request.headers.get("content-type", "")
-
+    variant = None
     if "application/json" in content_type:
         body = await request.json()
         image_url = body.get("image_url")
         question = body.get("question", "")
         stream = body.get("stream", False)
         settings = body.get("settings", {})
+        variant = body.get("variant")
+        reasoning = body.get("reasoning", False)
         if not image_url or not question:
             raise HTTPException(
                 status_code=400,
@@ -221,11 +232,21 @@ async def query_endpoint(
             question=question,
             stream=True,
             settings=settings,
+            variant=variant,
         )
         return StreamingResponse(event_generator, media_type="text/event-stream")
     else:
-        result = process_inference(image, model_service.query, question=question)
-        return JSONResponse({"answer": result["answer"], "request_id": 0})
+        result = process_inference(
+            image,
+            model_service.query,
+            question=question,
+            variant=variant,
+            reasoning=reasoning,
+        )
+        resp = {"answer": result["answer"], "request_id": 0}
+        if result.get("reasoning"):
+            resp["reasoning"] = result.get("reasoning")
+        return JSONResponse(resp)
 
 
 @app.post("/v1/detect", summary="Detect objects in an image")
@@ -236,18 +257,22 @@ async def detect_endpoint(
     model_service: ModelService = Depends(get_model_service),
 ):
     content_type = request.headers.get("content-type", "")
+    variant = None
 
     if "application/json" in content_type:
         body = await request.json()
         image_url = body.get("image_url")
         obj = body.get("object", "")
+        variant = body.get("variant")
         if not image_url or not obj:
             raise HTTPException(
                 status_code=400,
                 detail="Both 'image_url' and 'object' must be present in JSON.",
             )
         image = load_base64_image(image_url)
-        result = process_inference(image, model_service.detect, obj=obj)
+        result = process_inference(
+            image, model_service.detect, obj=obj, variant=variant
+        )
         obj = result.get("objects", [])
         return JSONResponse({"objects": obj, "request_id": 0})
     else:
@@ -281,13 +306,14 @@ async def point_endpoint(
         body = await request.json()
         image_url = body.get("image_url")
         obj = body.get("object", "")
+        variant = body.get("variant")
         if not image_url or not obj:
             raise HTTPException(
                 status_code=400,
                 detail="Both 'image_url' and 'object' must be present in JSON.",
             )
         image = load_base64_image(image_url)
-        result = process_inference(image, model_service.point, obj=obj)
+        result = process_inference(image, model_service.point, obj=obj, variant=variant)
         points = result.get("points", [])
         return JSONResponse({"points": points, "count": len(points)})
     else:
@@ -332,9 +358,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--revision", type=str, default=None, help="Moondream revision to use"
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--model-id", type=str, default=None, help="Moondream model ID to use"
+    )
+    args, _ = parser.parse_known_args()
 
-    app.state.revision = args.revision
+    if args.model_id:
+        app.state.model_id = args.model_id
+
+    if args.revision:
+        app.state.revision = args.revision
 
     logger.info(f"Starting server on port: {args.port}")
     uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="error")

@@ -13,10 +13,10 @@ class ModelService:
         self.device = self._get_best_device()
         logger.info(f"Initializing model on device: {self.device}")
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name, revision=revision, trust_remote_code=True
+            model_name, revision=None, trust_remote_code=True
         )
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, revision=revision, trust_remote_code=True
+            model_name, revision=None, trust_remote_code=True
         )
         self.model.to(self.device)
         logger.info(f"Model commit hash: {self.model.config._commit_hash}")
@@ -32,8 +32,14 @@ class ModelService:
             return "cpu"
 
     def caption(
-        self, image: Image.Image, length: str, stream: bool = False, settings: dict = {}
+        self,
+        image: Image.Image,
+        length: str,
+        stream: bool = False,
+        settings: dict = {},
+        variant: str = None,
     ) -> dict:
+        settings["variant"] = variant
         return self.model.caption(
             image, length=length, stream=stream, settings=settings
         )
@@ -44,11 +50,26 @@ class ModelService:
         question: str,
         stream: bool = False,
         settings: dict = {},
+        variant: str = None,
+        reasoning: bool = False,
     ) -> dict:
-        return self.model.query(image, question, stream, settings)
+        settings["variant"] = variant
+        return self.model.query(
+            image, question, stream=stream, settings=settings, reasoning=reasoning
+        )
 
-    def detect(self, image: Image.Image, obj: str, settings: dict = {}) -> dict:
+    def detect(
+        self,
+        image: Image.Image,
+        obj: str,
+        settings: dict = {},
+        variant=None,
+    ) -> dict:
+        settings["variant"] = variant
         return self.model.detect(image, obj, settings)
 
-    def point(self, image: Image.Image, obj: str, settings: dict = {}) -> dict:
+    def point(
+        self, image: Image.Image, obj: str, settings: dict = {}, variant=None
+    ) -> dict:
+        settings["variant"] = variant
         return self.model.point(image, obj, settings)

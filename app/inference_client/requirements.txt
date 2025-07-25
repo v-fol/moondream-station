@@ -1,11 +1,13 @@
-transformers==4.44.0
+transformers==4.53.1
 torch==2.6.0
 pillow==10.4.0
-pyvips==2.2.3
-accelerate==1.6.0
-huggingface-hub==0.24.0
+pyvips>=3.0.0
+cffi>=1.17.1
+accelerate
+huggingface-hub
 fastapi==0.115.12
 starlette==0.41.0
 python-multipart
 uvicorn==0.34.0
 Numpy==1.26.1
+torchao==0.11.0

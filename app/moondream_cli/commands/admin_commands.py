@@ -22,18 +22,19 @@ def check_platform() -> str:
     if system == "darwin":
         return "macOS"
     elif system == "linux":
-        # Check if it's Ubuntu or a derivative
-        try:
-            import os
+        return "Linux"
+        # # Check if it's Ubuntu or a derivative
+        # try:
+        #     import os
 
-            if os.path.exists("/etc/lsb-release"):
-                with open("/etc/lsb-release", "r") as f:
-                    if "ubuntu" in f.read().lower():
-                        return "ubuntu"
-            # Fallback for other detection methods
-            return "ubuntu"
-        except:
-            return "ubuntu"  # Assume Ubuntu for Linux
+        #     if os.path.exists("/etc/lsb-release"):
+        #         with open("/etc/lsb-release", "r") as f:
+        #             if "ubuntu" in f.read().lower():
+        #                 return "ubuntu"
+        #     # Fallback for other detection methods
+        #     return "ubuntu"
+        # except:
+        #     return "ubuntu"  # Assume Ubuntu for Linux
     else:
         return "unsupported"
 
@@ -354,10 +355,10 @@ class AdminCommands:
             for key, name in components.items():
                 if key in result:
                     status = result[key]
-                    version = status.get("version", None) or status.get("revision", "")
+                    identifier = status.get("model_name") or status.get("version", "Unknown")
                     needs_update = status.get("ood", False)
                     update_status = "Update available" if needs_update else "Up to date"
-                    print(f"{name}: {version} - {update_status}")
+                    print(f"{name}: {identifier} - {update_status}")
                 else:
                     print(f"{name}: Status unknown")
 
@@ -389,7 +390,7 @@ class AdminCommands:
 
             # Exit after CLI update is complete on Ubuntu, as the CLI process needs to end
             # so that the new CLI can be used on next invocation
-            if check_platform() == "ubuntu":
+            if check_platform() == "Linux":
                 print(
                     "⚠️ CLI update complete. Please restart the CLI to use the updated version."
                 )
@@ -397,7 +398,7 @@ class AdminCommands:
 
         except requests.exceptions.ConnectionError:
             print("Update initiated. CLI is updating...")
-            if check_platform() == "ubuntu":
+            if check_platform() == "Linux":
                 sys.exit(0)
         except Exception as e:
             print(f"Error initiating CLI update: {e}")

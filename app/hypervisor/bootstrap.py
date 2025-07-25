@@ -15,21 +15,25 @@ import shutil
 
 from display_utils import print_banner, Spinner
 from config import DEFAULT_CONFIG
-from misc import download_file, check_platform, get_app_dir
+from misc import download_file, check_platform, get_app_dir, get_component_version
 
 PLATFORM = check_platform()
 if PLATFORM == "macOS":
-    MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
-elif PLATFORM == "ubuntu":
-    MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-Linux-x86_64.sh"
-else:
-    sys  # Executable permissions are now handled in the code aboveOnly macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
+    MINIFORGE_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
+    HYPERVISOR_TAR_URL = (
+        f"https://depot.moondream.ai/station/md_station_hypervisor.tar.gz"
+    )
+elif PLATFORM == "Linux":
+    MINIFORGE_URL = "https://depot.moondream.ai/station/Miniforge3-Linux-x86_64.sh"
+    HYPERVISOR_TAR_URL = (
+        f"https://depot.moondream.ai/station/md_station_hypervisor_ubuntu.tar.gz"
+    )
 
 PYTHON_VERSION = "3.10"
-BOOTSTRAP_VERSION = "v0.0.1"
-HYPERVISOR_TAR_URL = (
-    f"https://depot.moondream.ai/station/md_station_hypervisor_ubuntu.tar.gz"
-)
+
+# Default version, can be overridden by info.json
+BOOTSTRAP_VERSION = get_component_version("v0.0.2")
+
 POSTHOG_PROJECT_API_KEY = "phc_8S71qk0L1WlphzX448tekgbnS1ut266W4J48k9kW0Cx"
 SSL_CERT_FILE = "SSL_CERT_FILE"
 
@@ -192,7 +196,7 @@ def setup_miniforge_if_needed(
     # Setup new Python installation
     logger.info(f"Setting up Python {python_version} in {version_dir}")
     os.makedirs(py_versions_dir, exist_ok=True)
-    setup_miniforge_installer(MINIFORGE_MAC_URL, version_dir, logger, python_version)
+    setup_miniforge_installer(MINIFORGE_URL, version_dir, logger, python_version)
     install_libvips_conda(version_dir, logger)
 
     return version_dir
@@ -311,6 +315,19 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
     if res.stderr:
         logger.debug(f"Pip upgrade stderr:\n{res.stderr}")
 
+    logger.info("Installing uv...")
+    with Spinner("Installing uv..."):
+        res_uv = subprocess.run(
+            [python_bin, "-m", "pip", "install", "--upgrade", "uv"],
+            capture_output=True,
+            text=True,
+        )
+    logger.info(f"uv install return code: {res_uv.returncode}")
+    if res_uv.stdout:
+        logger.debug(f"uv install stdout:\n{res_uv.stdout}")
+    if res_uv.stderr:
+        logger.debug(f"uv install stderr:\n{res_uv.stderr}")
+
     if not os.path.isfile(requirements_file):
         logger.info(f"'{requirements_file}' not found, skipping requirements install.")
         return
@@ -318,7 +335,7 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
     logger.info(f"Installing requirements from {requirements_file}")
     with Spinner("Installing Python requirements (this may take several minutes)..."):
         res = subprocess.run(
-            [python_bin, "-m", "pip", "install", "-U", "-r", requirements_file],
+            [python_bin, "-m", "uv", "pip", "install", "-U", "-r", requirements_file],
             capture_output=True,
             text=True,
         )
@@ -346,7 +363,9 @@ def _unset_sll_cert(signum: int, frame, logger: logging.Logger) -> None:
     sys.exit(128 + signum)
 
 
-def run_main_loop(venv_dir: str, app_dir: str, logger: logging.Logger):
+def run_main_loop(
+    venv_dir: str, app_dir: str, logger: logging.Logger, manifest_url: str = None
+):
     """Run the hypervisor server in a loop, restarting if needed.
     If exit code 99 is intercepted, update bootstrap. The update subprocess
     will kill and restart bootstrap.
@@ -366,40 +385,37 @@ def run_main_loop(venv_dir: str, app_dir: str, logger: logging.Logger):
         signal.signal(signal.SIGINT, handler)
         signal.signal(signal.SIGTERM, handler)
 
-    while return_code == 0:
-        if not os.path.isfile(main_py):
-            logger.warning(f"'{main_py}' not found.")
-            return
+    if not os.path.isfile(main_py):
+        logger.warning(f"'{main_py}' not found.")
+        return
+    cmd = [python_bin, main_py]
+    if manifest_url:
+        cmd.extend(["--manifest-url", manifest_url])
 
-        logger.info(f"Launching {main_py} via {python_bin}")
+    logger.info(f"Launching {main_py} via {python_bin}")
+    logger.info(f"Command to execute: {' '.join(cmd)}")
 
-        proc = subprocess.Popen([python_bin, main_py])
-        return_code = proc.wait()
-        logger.warning(f"{main_py} exited with code {return_code}; restarting in 5s.")
-        if return_code != 0:
+    proc = subprocess.Popen(cmd)
+    return_code = proc.wait()
+    logger.info(f"{main_py} exited with code {return_code}")
+
+    if return_code == 99:
+        print("Bootstrap update requested. Starting update process...")
+        try:
+            update_success = update_bootstrap(app_dir, logger)
+            if not update_success:
+                if PLATFORM == "macOS":
+                    print("Update process failed. Continuing with current version.")
+                else:
+                    print("⚠️ Restart Moondream Station for update to take effect")
+        except Exception as e:
+            logger.info(f"Update process failed with exception: {e}")
+            import traceback
+
+            logger.info(f"Exception details: {traceback.format_exc()}")
             print(
-                f"Moondream Station exited with code {return_code}; restarting in 5 seconds..."
+                "Update process encountered an error. Continuing with current version."
             )
-
-        if return_code == 99:
-            print("Bootstrap update requested. Starting update process...")
-            try:
-                update_success = update_bootstrap(app_dir, logger)
-                if not update_success:
-                    if PLATFORM == "macOS":
-                        print("Update process failed. Continuing with current version.")
-                    else:
-                        print("⚠️ Restart Moondream Station for update to take effect")
-            except Exception as e:
-                logger.error(f"Update process failed with exception: {e}")
-                import traceback
-
-                logger.error(f"Exception details: {traceback.format_exc()}")
-                print(
-                    "Update process encountered an error. Continuing with current version."
-                )
-
-        time.sleep(5)
 
 
 def download_and_extract_hypervisor(app_dir: str, logger: logging.Logger) -> bool:
@@ -604,7 +620,6 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
         tar_path = os.path.join(download_dir, f"bootstrap_{bootstrap_version}.tar.gz")
 
         try:
-            # Download the bootstrap tarball
             logger.info(
                 f"Downloading bootstrap tarball from {bootstrap_url} to {tar_path}"
             )
@@ -613,7 +628,6 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
             # Create extraction directory
             os.makedirs(download_dir, exist_ok=True)
 
-            # Extract the tarball
             logger.info(f"Extracting bootstrap archive to {download_dir}")
             with tarfile.open(tar_path, "r:gz") as tar:
                 tar.extractall(path=download_dir)
@@ -629,14 +643,12 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
 
             logger.info(f"Found bootstrap executable at {bootstrap_exe}")
 
-            # Set executable permissions
             try:
                 os.chmod(bootstrap_exe, 0o755)
                 logger.info(f"Set executable permissions")
             except:
                 logger.info("Could not set executable permissions")
 
-            # Use the update_bootstrap.sh script to handle the update process
             update_script_path = os.path.join(app_dir, "update_bootstrap.sh")
             if not os.path.exists(update_script_path):
                 logger.error(f"Update script not found at {update_script_path}")
@@ -651,7 +663,7 @@ def update_bootstrap(app_dir: str, logger: logging.Logger) -> bool:
                 launch_update_bash_mac(
                     update_script_path, bootstrap_exe, current_app_bundle
                 )
-            elif PLATFORM == "ubuntu":
+            elif PLATFORM == "Linux":
                 launch_update_bash_ubuntu(
                     update_script_path, bootstrap_exe, current_app_bundle, logger
                 )
@@ -734,7 +746,7 @@ def is_setup(app_dir: str) -> bool:
     return True
 
 
-def main(verbose: bool = False):
+def main(verbose: bool = False, manifest_url: str = None):
     """Entry point for Moondream Station.
 
     Handles setup of Python environment, downloads necessary components,
@@ -746,7 +758,6 @@ def main(verbose: bool = False):
     """
     start_time = time.time()
 
-    # Configure spinner based on arguments
     Spinner.enabled = not verbose
     Spinner.show_animation = not PLATFORM == "macOS"
 
@@ -778,11 +789,11 @@ def main(verbose: bool = False):
     update_config_bootstrap_version(app_dir, logger)
 
     if not is_setup(app_dir):
-        if PLATFORM == "ubuntu":
+        if PLATFORM == "Linux":
             subprocess.run(
                 ["sudo", "apt", "update"],
-                check=True,  # raise if the command exits non-zero
-                text=True,  # decode stdout/stderr as text
+                check=True,
+                text=True,
             )
             subprocess.run(["sudo", "apt", "upgrade", "-y"], check=True, text=True)
 
@@ -803,7 +814,8 @@ def main(verbose: bool = False):
     elapsed_time = time.time() - start_time
     logger.info(f"Bootup completed in {elapsed_time:.2f} seconds")
 
-    run_main_loop(venv_dir, app_dir, logger)
+    logger.info(f"Main function manifest_url: {manifest_url}")
+    run_main_loop(venv_dir, app_dir, logger, manifest_url=manifest_url)
 
 
 if __name__ == "__main__":
@@ -816,6 +828,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Print detailed information to stdout",
     )
+    parser.add_argument("--manifest-url", type=str, help="Custom manifest URL")
     args = parser.parse_args()
 
-    main(verbose=args.verbose)
+    main(verbose=args.verbose, manifest_url=args.manifest_url)

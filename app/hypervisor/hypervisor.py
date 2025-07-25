@@ -13,11 +13,12 @@ from inferencevisor import InferenceVisor
 from clivisor import CLIVisor
 from manifest import Manifest
 from config import Config
-from misc import download_file, get_app_dir, check_platform
+from misc import download_file, get_app_dir, check_platform, get_component_version
 from display_utils import Spinner
 
 logger = logging.getLogger("hypervisor")
-HYPERVISOR_VERSION = "v0.0.1"
+HYPERVISOR_VERSION = get_component_version("v0.0.2")
+
 PLATFORM = check_platform()
 
 
@@ -29,11 +30,9 @@ class Hypervisor:
     including the inference server, CLI, and handling updates and metrics.
     """
 
-    def __init__(
-        self,
-    ):
+    def __init__(self, manifest_url: Optional[str] = None):
         self.config = Config()
-        self.manifest = Manifest()
+        self.manifest = Manifest(url=manifest_url)
         self.inferencevisor = InferenceVisor(self.config, self.manifest)
         self.clivisor = CLIVisor(self.config, self.manifest)
 

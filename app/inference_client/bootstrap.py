@@ -11,16 +11,15 @@ import signal
 from functools import partial
 from misc import check_platform
 
-MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
 PYTHON_VERSION = "3.10"
 
 PLATFORM = check_platform()
 if PLATFORM == "macOS":
     MINIFORGE_MAC_URL = "https://depot.moondream.ai/station/Miniforge3-MacOSX-arm64.sh"
-elif PLATFORM == "ubuntu":
+elif PLATFORM == "Linux":
     MINIFORGE_MAC_URL = "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
 else:
-    sys.exit(f"Only macOS and Ubuntu are supported. Detected platform is {PLATFORM}")
+    sys.exit(f"Only macOS and Linux are supported. Detected platform is {PLATFORM}")
 
 
 def get_executable_dir() -> str:
@@ -271,9 +270,23 @@ def install_requirements(venv_dir: str, logger: logging.Logger):
         logger.info(f"'{requirements_file}' not found, skipping requirements install.")
         return
 
+    logger.info("Installing 'uv' into venv...")
+    res = subprocess.run(
+        [python_bin, "-m", "pip", "install", "--upgrade", "uv"],
+        capture_output=True,
+        text=True,
+    )
+    logger.info(f"'uv' install return code: {res.returncode}")
+    if res.stdout:
+        logger.debug(f"'uv' install stdout:\n{res.stdout}")
+    if res.stderr:
+        logger.debug(f"'uv' install stderr:\n{res.stderr}")
+    if res.returncode != 0:
+        raise RuntimeError("Failed to install 'uv' via pip.")
+
     logger.info(f"Installing requirements from {requirements_file}")
     res = subprocess.run(
-        [python_bin, "-m", "pip", "install", "-U", "-r", requirements_file],
+        [python_bin, "-m", "uv", "pip", "install", "-r", requirements_file],
         capture_output=True,
         text=True,
     )

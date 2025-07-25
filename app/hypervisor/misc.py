@@ -1,7 +1,38 @@
 import platform
 import urllib.request
 import os
+import json
+import logging
 from pathlib import Path
+import sys
+
+
+def get_component_version(fallback_version="v0.0.1"):
+    """Load component version from bundled info.json"""
+    try:
+        # First, try current directory (for hypervisor Python files)
+        info_path = os.path.join(os.path.dirname(__file__), "info.json")
+
+        if not os.path.exists(info_path) and getattr(sys, "frozen", False):
+            # If not found and we're in PyInstaller bundle
+            info_path = os.path.join(sys._MEIPASS, "info.json")
+
+        if os.path.exists(info_path):
+            with open(info_path, "r") as f:
+                info = json.load(f)
+                version = info.get("version", fallback_version)
+                logging.info(f"Loaded version {version} from {info_path}")
+                return version
+        else:
+            logging.info(
+                f"No info.json found at {info_path}, using fallback {fallback_version}"
+            )
+    except Exception as e:
+        logging.warning(
+            f"Could not load version from info.json: {e}, using fallback {fallback_version}"
+        )
+
+    return fallback_version
 
 
 def parse_version(version: str) -> tuple[int, ...]:
@@ -14,18 +45,23 @@ def parse_version(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
 
-def parse_revision(revision: str) -> tuple[int, ...]:
-    """Extract integer components from a revision string.
+def parse_date(date: str) -> tuple[int, ...]:
+    """Extract integer components from a date string.
 
-    This helper gracefully handles revisions that contain alphabetic
-    prefixes/suffixes such as ``2025-04-14-4bit`` or ``4bit-2025-04-14``.
+    Converts date strings like "2025-05-21" into comparable tuples.
     Any numeric sequences found in the string are returned as a tuple of
-    integers.  If no digits are found, ``(0,)`` is returned so that the
+    integers. If no digits are found, ``(0,)`` is returned so that the
     value can still participate in comparisons.
+
+    Examples:
+        "2025-05-21" → (2025, 5, 21)
+        "2025-4-14" → (2025, 4, 14)
+        "2025-03-27" → (2025, 3, 27)
+        "invalid" → (0,)
     """
     import re
 
-    numeric_parts = re.findall(r"\d+", revision)
+    numeric_parts = re.findall(r"\d+", date)
     if not numeric_parts:
         return (0,)
     return tuple(int(part) for part in numeric_parts)
@@ -46,21 +82,17 @@ def is_macos():
     return platform.system().lower().startswith("darwin")
 
 
-def is_ubuntu() -> bool:
-    if platform.system().lower() != "linux":
-        return False
-    try:
-        import distro
-    except ModuleNotFoundError:
-        return False
-    return distro.id() == "ubuntu"
+def is_linux() -> bool:
+    return platform.system() == "Linux"
 
 
 def check_platform() -> str:
     if is_macos():
         return "macOS"
-    elif is_ubuntu():
-        return "ubuntu"
+    elif is_linux():
+        return "Linux"
+    else:
+        return "other"
 
 
 def get_app_dir(platform: str = None) -> str:
@@ -69,7 +101,7 @@ def get_app_dir(platform: str = None) -> str:
     """Get the application support directory for Moondream Station."""
     if platform == "macOS":
         app_dir = Path.home() / "Library"
-    elif platform == "ubuntu":
+    elif platform == "Linux":
         app_dir = Path(
             os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")
         )
