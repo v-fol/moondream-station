@@ -1,5 +1,44 @@
-# moondream-station
-<img width="510" height="282" alt="mds_wip_sc" src="https://github.com/user-attachments/assets/a1fe01fc-29ea-4050-b45b-8a3df2575c7b" />
+<div>
+   <p align="center">
+   <img src="assets/md_logo_clean.png" alt="Moondream Station Logo" width="200"/>
+   </p>
+
+   <h3 align="center"><strong>Moondream Station: 100% free local visual reasoning</strong></h3>
+
+   <p align="center">
+      <a href="https://moondream.ai/station" target="_blank"><img src="https://img.shields.io/badge/Home-%F0%9F%8F%A0-blue?style=flat-square" alt="Home Page"></a>
+      <a href="https://discord.gg/QTaWPdDZ" target="_blank"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white&style=flat-square" alt="Discord"></a>
+      <a href="https://x.com/moondreamai" target="_blank"><img src="https://img.shields.io/badge/follow-%40moondreamai-000000?style=flat-square&logo=x&logoColor=white" alt="Follow @moondreamai"></a>
+      <a href="LICENSE" target="_blank"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
+   </p>
+</div>
+
+<hr style="height:3px;border:none;background:#e0e0e0;margin:24px 0;">
+
+<table align="center">
+<tr>
+<td width="420" align="center" valign="middle">
+
+<!-- Demo video -->
+![Video showing Moondream Station running in a terminal](assets/md_station_demo.gif)
+
+</td>
+<td width="400" align="left" valign="middle">
+
+### How It Works
+
+🚀 **Launches Local Server**  
+   All inference runs on your device
+
+🔧 **Control via CLI**  
+   Caption images, answer questions, and manage settings
+
+🌐 **Access via HTTP**  
+   Connect to `http://localhost:2020/v1` through REST or our [Python](https://pypi.org/project/moondream/), [Node](https://www.npmjs.com/package/moondream), or [OpenAI](https://github.com/openai/openai-python) client
+
+</td>
+</tr>
+</table>
 
 ## Installation
 
