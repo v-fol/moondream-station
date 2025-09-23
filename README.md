@@ -1,6 +1,6 @@
 <div>
    <p align="center">
-   <img src="https://raw.githubusercontent.com/m87-labs/moondream-station/55878b16dd3a675a9ccf9a292975aee97d055beb/assets/md_station_demo.gif" alt="Moondream Station Logo" width="200"/>
+   <img src="https://raw.githubusercontent.com/m87-labs/moondream-station/55878b16dd3a675a9ccf9a292975aee97d055beb/assets/md_logo_clean.png" alt="Moondream Station Logo" width="200"/>
    </p>
 
    <h3 align="center"><strong>Moondream Station: Local Visual Reasoning</strong></h3>
@@ -20,7 +20,7 @@
 <td width="420" align="center" valign="middle">
 
 <!-- Demo video -->
-![Video showing Moondream Station running in a terminal](assets/md_station_demo.gif)
+![Video showing Moondream Station running in a terminal](https://raw.githubusercontent.com/m87-labs/moondream-station/55878b16dd3a675a9ccf9a292975aee97d055beb/assets/md_station_demo.gif)
 
 </td>
 <td width="400" align="left" valign="middle">
@@ -44,14 +44,14 @@
 
 Install from PyPI:
 ```bash
-pip install moondream-station
+$ pip install moondream-station
 ```
 
 Install from source:
 ```bash
-git clone https://github.com/m87-labs/moondream-station.git
-cd moondream-station
-pip install -e .
+$ git clone https://github.com/m87-labs/moondream-station.git
+$ cd moondream-station
+$ pip install -e .
 ```
 That's it! Moondream Station will automatically set itself up.
 
