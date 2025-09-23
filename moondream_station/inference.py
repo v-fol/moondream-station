@@ -1,10 +1,5 @@
 import base64
 import inspect
-
-try:
-    import readline
-except ImportError:
-    readline = None
 import shlex
 import time
 from pathlib import Path
@@ -21,19 +16,8 @@ class InferenceHandler:
 
     def _get_input_with_readline(self, prompt: str) -> str:
         """Get user input using readline with prompt protection"""
-        try:
-            # Ensure readline is available and configured
-            if readline and hasattr(readline, "get_line_buffer"):
-                # Standard input() with readline should protect the prompt
-                # Make sure readline editing mode is enabled
-                readline.parse_and_bind("set editing-mode emacs")
-                return input(prompt)
-            else:
-                return input(prompt)
-
-        except (ImportError, NameError):
-            # Fallback if readline is not available
-            return input(prompt)
+        # Use the same method from repl for consistency
+        return self.repl._get_input_with_readline(prompt)
 
     def infer(self, args: List[str]):
         """Run inference: infer <function> [args]"""
