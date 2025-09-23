@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moondream-station"
-version = "0.1.0"
-description = "A CLI tool for hosting and managing ML models"
+version = "0.1.4"
+description = "Local inference and model management."
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
@@ -30,3 +30,9 @@ Repository = "https://github.com/m87/moondream-station"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["moondream_station*"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+moondream_station = ["requirements.txt"]

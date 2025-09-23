@@ -21,12 +21,13 @@ DEFAULT_MANIFEST_URL = "https://m87-md-prod-assets.s3.us-west-2.amazonaws.com/st
 
 
 class MoondreamStationLauncher:
-    def __init__(self):
+    def __init__(self, dev_mode: bool = False):
         self.app_dir = Path.home() / ".moondream-station"
         self.venv_dir = self.app_dir / "venv"
         self.python_exe = self._get_venv_python()
         self.analytics_client = None
         self.console = Console()
+        self.dev_mode = dev_mode
         self._setup_analytics()
 
     @contextlib.contextmanager
@@ -161,7 +162,7 @@ class MoondreamStationLauncher:
         """Install required packages from requirements.txt"""
         self._track("requirements_install_start")
 
-        moondream_station_root = Path(__file__).parent.parent
+        moondream_station_root = Path(__file__).parent
         requirements_file = moondream_station_root / "requirements.txt"
 
         cmd = [
@@ -187,16 +188,27 @@ class MoondreamStationLauncher:
             self._track("requirements_install_success")
 
     def _install_moondream_station(self):
-        """Install moondream-station package in development mode"""
-        moondream_station_root = Path(__file__).parent.parent
-        cmd = [
-            str(self.python_exe),
-            "-m",
-            "pip",
-            "install",
-            "-e",
-            str(moondream_station_root),
-        ]
+        """Install moondream-station package"""
+        if self.dev_mode:
+            # Development mode - install from local source
+            moondream_station_root = Path(__file__).parent.parent
+            cmd = [
+                str(self.python_exe),
+                "-m",
+                "pip",
+                "install",
+                "-e",
+                str(moondream_station_root),
+            ]
+        else:
+            # Production mode - install from PyPI
+            cmd = [
+                str(self.python_exe),
+                "-m",
+                "pip",
+                "install",
+                "moondream-station",
+            ]
 
         with self.spinner("Installing moondream-station package"):
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -293,6 +305,7 @@ class MoondreamStationLauncher:
 
         # Always update requirements in case they changed
         self._install_requirements()
+        self._install_moondream_station()
         self._install_backend_requirements(args)
 
     def launch(self, args: list[str]):
@@ -320,8 +333,16 @@ class MoondreamStationLauncher:
 
 
 def main():
-    launcher = MoondreamStationLauncher()
-    launcher.launch(sys.argv[1:])
+    args = sys.argv[1:]
+    dev_mode = False
+
+    # Check for --dev flag
+    if "--dev" in args:
+        dev_mode = True
+        args.remove("--dev")
+
+    launcher = MoondreamStationLauncher(dev_mode=dev_mode)
+    launcher.launch(args)
 
 
 if __name__ == "__main__":

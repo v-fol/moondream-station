@@ -230,7 +230,7 @@ class CommandHandlers:
                 "inference_workers",
                 "inference_max_queue_size",
                 "inference_timeout",
-                "auto_start",
+                "logging",
             }
 
             if key not in settable_params:
@@ -247,6 +247,8 @@ class CommandHandlers:
                 elif key == "inference_timeout":
                     value = float(value)
                 elif key == "auto_start":
+                    value = value.lower() in ("true", "yes", "1", "on")
+                elif key == "logging":
                     value = value.lower() in ("true", "yes", "1", "on")
             except ValueError:
                 self.repl.display.error(f"Invalid value for {key}: {value}")
@@ -307,7 +309,7 @@ class CommandHandlers:
             "inference_workers",
             "inference_max_queue_size",
             "inference_timeout",
-            "auto_start",
+            "logging",
         }
 
         for key, display_name in service_settings:
@@ -326,6 +328,7 @@ class CommandHandlers:
             ("inference_workers", "inference_workers"),
             ("inference_max_queue_size", "inference_max_queue_size"),
             ("inference_timeout", "inference_timeout"),
+            ("logging", "logging"),
         ]
 
         for key, display_name in inference_settings:

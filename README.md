@@ -42,73 +42,88 @@
 
 ## Installation
 
+Install from PyPI:
 ```bash
+pip install moondream-station
+```
+
+Install from source:
+```bash
+git clone https://github.com/m87-labs/moondream-station.git
+cd moondream-station
 pip install -e .
 ```
+That's it! Moondream Station will automatically set itself up.
 
 ## Usage
 
-```bash
-moondream-station
+### Launch Moondream Station
+
+To fire up Moondream Station, execute this command in your terminal:
+```
+$ moondream-station
 ```
 
-## Commands
-
 ### Model Management
+By default, Moondream Station uses the latest model your machine supports. If you want to view or activate other Moondream models, use the following commands:
 - `models` - List available models
 - `models switch <model>` - Switch to a model
 
 ### Service Control
+We like to think Moondream has 20/20 vision; that’s why we launch Moondream Station on port 2020. If that port is taken, Moondream Station will try to use nearby port that is free. Additionally, you can control the port and the status of the inference service with the following commands:
 - `start [port]` - Start REST server (default: port 2020)
 - `stop` - Stop server
 - `restart` - Restart server
 
 ### Inference
+**Access via HTTP**: 
+Point any of our inference clients at your Moondream Station; for example, with our python client you can do:
+
+```python
+import moondream as md
+from PIL import Image
+
+# connect to Moondream Station
+model = md.vl(endpoint="http://localhost:2020/v1")
+
+# Load an image
+image = Image.open("path/to/image.jpg")
+
+# Ask a question
+answer = model.query(image, "What's in this image?")["answer"]
+print("Answer:", answer)
+```
+For more information on our clients visit: [Python](https://pypi.org/project/moondream/), [Node](https://www.npmjs.com/package/moondream), [Quick Start](https://moondream.ai/c/docs/quickstart)
+
+**Connect via CLI**: 
+Use all the capabilities of Moondream directly through your terminal. No need to touch any code!
 <img width="522" height="376" alt="Screenshot 2025-09-12 at 8 59 09 PM" src="https://github.com/user-attachments/assets/855d10b6-fb95-4731-9fbd-ce7cc46e78a3" />
 
 - `infer <function> [args]` - Run single inference
 - `inference` - Enter interactive inference mode
 
 ### Settings
+Control the number of workers, queue size, privacy settings, and more through Settings:
 <img width="516" height="362" alt="Screenshot 2025-09-12 at 9 01 57 PM" src="https://github.com/user-attachments/assets/696189b2-b8cc-4785-88a2-cb11f805668f" />
 
 - `settings` - Show configuration
 - `settings set <key> <value>` - Set setting value
 
+Moondream Station collects anonymous usage metrics to help us improve the app. The following data is collected:
+
+- **Event data**: When you use features like caption, query, detect, or point
+- **Version information**: Active bootstrap, hypervisor, inference client, and model version
+- **System information**: OS version, IP address, and Python version/runtime
+
+No personal information, image, or prompt/response is ever collected. To opt-out of logging run: `settings set logging false`.
+
 ### Utility
+The utility functinos provide insite into what Moondream Station is currently doing. To view statistics for your current session, use the `session` mode. To view a log of requests processed by Moondream Station, use the `history` command.
 <img width="503" height="225" alt="Screenshot 2025-09-12 at 9 01 08 PM" src="https://github.com/user-attachments/assets/486780e1-08c6-46d4-bebb-77aadd1ca73b" />
 
 - `session` - Show session stats
 - `help` - Show available commands
 - `history` - Show command history
+- `reset` - Reset app data & settings
 - `clear` - Clear screen
 - `exit` - Quit application
-
-## REST API
-
-Once a model is running, HTTP requests are routed to backend functions:
-
-```bash
-# Start server
-start
-
-# Make requests
-curl -X POST http://localhost:2020/v1/caption \
-  -H "Content-Type: application/json" \
-  -d '{"image_url": "data:image/jpeg;base64,...", "length": "short"}'
-
-curl -X POST http://localhost:2020/v1/query \
-  -H "Content-Type: application/json" \
-  -d '{"image_url": "data:image/jpeg;base64,...", "question": "What is this?"}'
-```
-
-Available endpoints depend on the loaded model backend.
-
-## Configuration
-
-Settings are stored in `~/.moondream-station/config.json`. Key settings:
-
-- `inference_workers` - Number of concurrent workers (default: 2)
-- `inference_timeout` - Request timeout in seconds (default: 60)
-- `auto_start` - Auto-start server when model selected (default: true)
-- `service_port` - Default server port (default: 2020)
