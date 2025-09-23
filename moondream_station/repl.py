@@ -1,12 +1,8 @@
 import sys
 import shlex
-
-try:
-    import readline
-except ImportError:
-    readline = None
-
 from typing import Dict, Callable
+from prompt_toolkit import prompt
+from prompt_toolkit.formatted_text import ANSI
 from rich.console import Console
 from rich.panel import Panel
 from rich import print as rprint
@@ -260,11 +256,9 @@ class REPLSession:
             model_name = current_model.name if current_model else "none"
             service_indicator = "🟢" if self.service.is_running() else "🔴"
 
-            # Create colored prompt for readline using ANSI codes (bold blue like rest of app)
-            plain_prompt = f"\033[34m\033[1mmoondream-station\033[0m ({model_name}) {service_indicator} > "
-
-            # Use readline for input with proper line editing
-            user_input = self._get_input_with_readline(plain_prompt).strip()
+            # Create colored prompt using prompt_toolkit with ANSI codes
+            colored_prompt = f"\033[34m\033[1mmoondream-station\033[0m ({model_name}) {service_indicator} > "
+            user_input = prompt(ANSI(colored_prompt)).strip()
 
             if not user_input:
                 return
@@ -278,22 +272,6 @@ class REPLSession:
             # Ctrl-D just prints a newline and returns empty input, don't exit
             rprint()
             return
-
-    def _get_input_with_readline(self, prompt: str) -> str:
-        """Get user input using readline with prompt protection"""
-        try:
-            # Ensure readline is available and configured
-            if readline and hasattr(readline, "get_line_buffer"):
-                # Standard input() with readline should protect the prompt
-                # Make sure readline editing mode is enabled
-                readline.parse_and_bind("set editing-mode emacs")
-                return input(prompt)
-            else:
-                return input(prompt)
-
-        except (ImportError, NameError):
-            # Fallback if readline is not available
-            return input(prompt)
 
     def _handle_slash_command(self, command: str):
         """Handle slash commands like /help, /exit"""

@@ -4,6 +4,8 @@ import shlex
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List
+from prompt_toolkit import prompt
+from prompt_toolkit.formatted_text import ANSI
 from rich import print as rprint
 from rich.panel import Panel
 
@@ -13,11 +15,6 @@ from .core.config import PANEL_WIDTH
 class InferenceHandler:
     def __init__(self, repl_session):
         self.repl = repl_session
-
-    def _get_input_with_readline(self, prompt: str) -> str:
-        """Get user input using readline with prompt protection"""
-        # Use the same method from repl for consistency
-        return self.repl._get_input_with_readline(prompt)
 
     def infer(self, args: List[str]):
         """Run inference: infer <function> [args]"""
@@ -155,9 +152,9 @@ class InferenceHandler:
 
         while True:
             try:
-                # Create colored prompt using ANSI codes (bold green for "inference")
-                plain_prompt = f"\033[32m\033[1minference\033[0m ({model_info.name}) > "
-                user_input = self._get_input_with_readline(plain_prompt).strip()
+                # Create colored prompt using prompt_toolkit with ANSI codes
+                colored_prompt = f"\033[32m\033[1minference\033[0m ({model_info.name}) > "
+                user_input = prompt(ANSI(colored_prompt)).strip()
 
                 if not user_input:
                     continue
