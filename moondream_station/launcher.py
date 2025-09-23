@@ -17,7 +17,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.console import Console
 from rich import print as rprint
 
-from moondream_station.cli import DEFAULT_MANIFEST_URL
+DEFAULT_MANIFEST_URL = "https://m87-md-prod-assets.s3.us-west-2.amazonaws.com/station/mds2/production_manifest.json"
 
 
 class MoondreamStationLauncher:
@@ -43,7 +43,7 @@ class MoondreamStationLauncher:
 
     def _setup_analytics(self):
         """Setup analytics from manifest if available"""
-        # Check connectivity before setting up PostHog
+        # Check we can access a Moondream Model
         try:
             response = requests.get(
                 "https://huggingface.co/vikhyatk/moondream2/resolve/main/config.json",
@@ -64,8 +64,13 @@ class MoondreamStationLauncher:
                 response.raise_for_status()
                 manifest_data = response.json()
             except:
-                # Try cache if URL fails
-                cache_file = self.app_dir / "models" / "cache" / "manifests" / "manifest_cache.json"
+                cache_file = (
+                    self.app_dir
+                    / "models"
+                    / "cache"
+                    / "manifests"
+                    / "manifest_cache.json"
+                )
                 if cache_file.exists():
                     with open(cache_file) as f:
                         manifest_data = json.load(f)
@@ -75,7 +80,7 @@ class MoondreamStationLauncher:
 
             analytics_config = manifest_data.get("analytics")
             if analytics_config:
-                posthog.disabled = False  # Re-enable now that we have connectivity
+                posthog.disabled = False
                 posthog.api_key = analytics_config.get("posthog_project_key")
                 posthog.host = analytics_config.get(
                     "posthog_host", "https://app.posthog.com"
