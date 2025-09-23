@@ -290,9 +290,9 @@ class MoondreamStationLauncher:
         """Set up the complete environment"""
         if not self._venv_exists():
             self._create_venv()
-            self._install_requirements()
-            self._install_moondream_station()
 
+        # Always update requirements in case they changed
+        self._install_requirements()
         self._install_backend_requirements(args)
 
     def launch(self, args: list[str]):
