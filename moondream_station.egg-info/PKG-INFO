@@ -1,3 +1,21 @@
+Metadata-Version: 2.4
+Name: moondream-station
+Version: 0.1.0
+Summary: A CLI tool for hosting and managing ML models
+Project-URL: Homepage, https://github.com/m87/moondream-station
+Project-URL: Repository, https://github.com/m87/moondream-station
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: requests>=2.25
+Requires-Dist: rich>=13.0
+Requires-Dist: posthog>=3.0.0
+Dynamic: license-file
+
 # moondream-station
 <img width="510" height="282" alt="mds_wip_sc" src="https://github.com/user-attachments/assets/a1fe01fc-29ea-4050-b45b-8a3df2575c7b" />
 

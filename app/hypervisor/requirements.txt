@@ -1,9 +1,0 @@
-fastapi==0.115.12
-starlette==0.41.0
-python-multipart
-uvicorn==0.34.0
-requests==2.31.0
-pillow==10.4.0
-moondream==0.1.0
-posthog==4.0.0
-distro

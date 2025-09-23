@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moondream-station"
+version = "0.1.0"
+description = "A CLI tool for hosting and managing ML models"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "requests>=2.25",
+    "rich>=13.0",
+    "posthog>=3.0.0",
+]
+
+[project.scripts]
+moondream-station = "moondream_station.launcher:main"
+
+[project.urls]
+Homepage = "https://moondream.ai/station"
+Repository = "https://github.com/m87/moondream-station"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["moondream_station*"]
