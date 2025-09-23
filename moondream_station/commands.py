@@ -86,7 +86,7 @@ class CommandHandlers:
                 )
                 self.repl.display.error(f"Failed to auto-start service: {str(e)}")
 
-    def start(self, args: List[str]):
+    def start(self, args: List[str], silent: bool = False):
         """Start service: start [model] [--port <port>]"""
         model = None
         port = None
@@ -134,7 +134,8 @@ class CommandHandlers:
 
         with self.repl.display.spinner(f"Starting model service: {current_model}"):
             if self.repl.service.start(current_model, service_port):
-                self.repl.display.success(f"Service started on port {service_port}")
+                if not silent:
+                    self.repl.display.success(f"Service started on port {service_port}")
                 self.repl.session_state.set_last_model(current_model)
                 self.repl.session_state.set_last_port(service_port)
                 return
@@ -144,14 +145,16 @@ class CommandHandlers:
                     service_port + 1, service_port + PORT_SEARCH_RANGE
                 ):
                     if self.repl.service.start(current_model, attempt_port):
-                        self.repl.display.success(
-                            f"Service started on port {attempt_port}"
-                        )
+                        if not silent:
+                            self.repl.display.success(
+                                f"Service started on port {attempt_port}"
+                            )
                         self.repl.session_state.set_last_model(current_model)
                         self.repl.session_state.set_last_port(attempt_port)
                         return
 
-            self.repl.display.error("Failed to start service")
+            if not silent:
+                self.repl.display.error("Failed to start service")
 
     def stop(self, args: List[str]):
         """Stop the service"""

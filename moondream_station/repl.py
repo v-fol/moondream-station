@@ -117,30 +117,16 @@ class REPLSession:
                     "auto_start_attempt",
                     {"model": model_name, "source": "manifest_default"},
                 )
-                try:
-                    service_port = self.config.get("service_port", 2020)
-                    with self.display.spinner(f"Preparing {model_name}"):
-                        result = self.service.start(model_name, service_port)
-
-                    if result:
-                        # Set the model in config since service started successfully
-                        self.config.set("current_model", model_name)
-                        self.analytics.track(
-                            "auto_start_success",
-                            {"model": model_name, "port": service_port},
-                        )
-                    else:
-                        self.analytics.track_error(
-                            "AutoStartError",
-                            "Service start returned False",
-                            "auto_start_service_failed",
-                        )
-                        self.display.error("Failed to start inference service")
-                except Exception as e:
+                # Switch to the model first, then use the existing start command
+                if self.models.switch_model(model_name, self.display):
+                    # Use the existing start command which handles port fallback (silent mode)
+                    self.commands.start([], silent=True)
+                else:
                     self.analytics.track_error(
-                        type(e).__name__, str(e), "auto_start_service_exception"
+                        "AutoStartError",
+                        "Failed to switch to model",
+                        "auto_start_model_switch_failed",
                     )
-                    self.display.error(f"Failed to auto-start service: {str(e)}")
             else:
                 self.analytics.track(
                     "auto_start_no_model", {"reason": "no_available_default_model"}
