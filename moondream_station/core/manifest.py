@@ -49,6 +49,7 @@ class ManifestData(BaseModel):
     moondream_station_info: Optional[Dict[str, Any]] = None
     version_messages: Optional[List[VersionMessage]] = None
     analytics: Optional[Dict[str, str]] = None
+    manual_url: Optional[str] = None
 
 
 class ManifestManager:
