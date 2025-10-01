@@ -10,7 +10,7 @@
     "models": {
         "moondream-3-preview": {
             "name": "Moondream 3 Preview",
-            "description": "Our largest and most powerful model.",
+            "description": "Our latest and most powerful model.",
             "backend": "moondream_backend",
             "args": {
                 "model_id": "moondream/moondream3-preview"
