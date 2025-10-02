@@ -1,2 +1,0 @@
-[console_scripts]
-moondream-station = moondream_station.launcher:main
