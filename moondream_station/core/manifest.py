@@ -6,6 +6,7 @@ import subprocess
 import tarfile
 import shutil
 import tempfile
+import platform
 
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -257,8 +258,22 @@ class ManifestManager:
                 with open(requirements_path, "w") as f:
                     f.write('\n'.join(missing_requirements))
 
+                # Build pip command
+                pip_cmd = [sys.executable, "-m", "pip", "install", "-r", str(requirements_path)]
+
+                # Add PyTorch index URL if needed
+                has_torch = any(
+                    req.lower().startswith(("torch", "torchvision", "torchaudio"))
+                    for req in missing_requirements
+                )
+
+                if has_torch:
+                    torch_index = self.config.get("torch_index_url")
+                    if torch_index and torch_index != "none":
+                        pip_cmd.extend(["--extra-index-url", torch_index])
+
                 result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "-r", str(requirements_path)],
+                    pip_cmd,
                     capture_output=True,
                     text=True,
                 )
@@ -418,7 +433,6 @@ class ManifestManager:
         if not self._manifest:
             return None
 
-        import platform
         current_os = platform.system().lower()
 
         for model_id, model_info in self._manifest.models.items():
