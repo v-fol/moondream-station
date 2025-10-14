@@ -4,6 +4,7 @@ from PIL import Image
 import logging
 import base64
 import io
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,12 @@ class ModelService:
         """Count tokens in text using the model's tokenizer"""
         return len(self.model.tokenizer.encode(text))
 
+    def encode_image(self, image: Image.Image):
+        """Return an encoded representation of the image if supported by the model."""
+        if hasattr(self.model, "encode_image"):
+            return self.model.encode_image(image)
+        return None
+
 
 def _load_base64_image(image_url: str) -> Image.Image:
     if image_url.startswith("data:image"):
@@ -196,5 +203,76 @@ def count_tokens(text: str = None, **kwargs):
         service = get_model_service()
         token_count = service.count_tokens(text)
         return {"token_count": token_count}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _parse_phrases(phrases=None, candidates=None, delimiter: str = ",") -> List[str]:
+    if isinstance(candidates, list):
+        return [str(p).strip() for p in candidates if str(p).strip()]
+    if isinstance(phrases, list):
+        return [str(p).strip() for p in phrases if str(p).strip()]
+    if phrases is None and candidates is None:
+        return []
+    raw = candidates if candidates is not None else phrases
+    return [p.strip() for p in str(raw).split(delimiter) if p.strip()]
+
+
+def batch_detect(
+    image_url: str = None,
+    phrases: Optional[object] = None,
+    candidates: Optional[object] = None,
+    delimiter: str = ",",
+    settings: dict = {},
+    **kwargs,
+):
+    """Batch object detection by reusing a single image encoding.
+
+    Inputs:
+      - image_url: base64 data URL or base64 string for the image
+      - phrases/candidates: list or comma-separated string of detection prompts
+      - delimiter: delimiter for phrases if provided as a string (default ",")
+      - settings: optional detection settings (e.g., {"max_objects": 50})
+
+    Output schema:
+      {"results": [{"id": <int>, "class": <str>, "objects": [...]}, ...]}
+    """
+    if not image_url:
+        return {"error": "image_url is required"}
+
+    targets = _parse_phrases(phrases=phrases, candidates=candidates, delimiter=delimiter)
+    if not targets:
+        return {"error": "phrases (list or comma-separated string) is required"}
+
+    try:
+        image = _load_base64_image(image_url)
+        service = get_model_service()
+
+        # Try to reuse encoded image if supported
+        encoded_image = service.encode_image(image)
+
+        results = []
+        for idx, phrase in enumerate(targets):
+            try:
+                if encoded_image is not None and hasattr(service.model, "detect"):
+                    det = service.model.detect(encoded_image, phrase, settings=settings or {})
+                else:
+                    det = service.detect(image, phrase, settings=settings or {})
+
+                objects = det.get("objects", []) if isinstance(det, dict) else []
+                results.append({
+                    "id": idx,
+                    "class": phrase,
+                    "objects": objects,
+                })
+            except Exception as e:
+                results.append({
+                    "id": idx,
+                    "class": phrase,
+                    "error": str(e),
+                    "objects": [],
+                })
+
+        return {"results": results}
     except Exception as e:
         return {"error": str(e)}

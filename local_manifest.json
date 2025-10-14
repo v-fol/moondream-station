@@ -54,7 +54,8 @@
         "caption",
         "query",
         "detect",
-        "point"
+        "point",
+        "batch_detect"
       ],
       "version": "1.0.0",
       "min_version": "0.1.0"
