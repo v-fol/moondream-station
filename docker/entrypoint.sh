@@ -37,7 +37,7 @@ cat > /root/.moondream-station/config.json <<EOF
 EOF
 
 # Force default model to Moondream3 when available in manifest
-export MDS_MANIFEST="${MDS_MANIFEST:-/app/production_manifest.json}"
+export MDS_MANIFEST="${MDS_MANIFEST:-/app/local_manifest.json}"
 
 echo "Starting Moondream Station with manifest: ${MDS_MANIFEST}"
 
