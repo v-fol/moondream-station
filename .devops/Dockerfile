@@ -11,18 +11,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# Copy project
 COPY . /app
 
-# Expose port
 EXPOSE 2020
 
-# Allow setting HF token at runtime via env var HF_TOKEN
-ENV HF_TOKEN=""
+RUN pip install -r requirements.txt && pip install -r backends/mds_backend_0/requirements.txt
 
-# Entry script handles non-interactive startup
-COPY install_and_run.sh /install_and_run.sh
-RUN chmod +x /install_and_run.sh
-
-ENTRYPOINT ["/install_and_run.sh"]
+CMD ["python3", "api_launcher.py"]
 
