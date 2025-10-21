@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-full python3-venv python3-pip git curl ca-certificates && \
+    python3-full python3-venv python3-pip curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -40,8 +40,8 @@ ENV MDS_MANIFEST=/app/local_manifest.json
 ENV HF_TOKEN=""
 
 # Entry script handles non-interactive startup
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY install_and_run.sh /install_and_run.sh
+RUN chmod +x /install_and_run.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/install_and_run.sh"]
 
