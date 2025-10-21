@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.8.0-runtime-ubuntu22.04
+FROM pytorch/pytorch:2.8.0-cuda12.9-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -9,32 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-full python3-venv python3-pip curl ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Copy project
 COPY . /app
 
-# Install moondream-station + backend requirements
-RUN pip3 install --upgrade pip && \
-    pip3 install -e . && \
-    # Core server deps
-    pip3 install -r moondream_station/requirements.txt && \
-    # Hugging Face CLI for login automation
-    pip3 install "huggingface_hub[cli]" && \
-    # Install GPU PyTorch matching CUDA 12.8
-    pip3 install --index-url https://download.pytorch.org/whl/cu128 torch torchvision torchaudio && \
-    # Backend deps (transformers/accelerate/Pillow); keeps installed GPU torch
-    pip3 install -r backends/mds_backend_0/requirements.txt
-
 # Expose port
 EXPOSE 2020
-
-# Default to local manifest (uses bundled backend code)
-ENV MDS_MANIFEST=/app/local_manifest.json
 
 # Allow setting HF token at runtime via env var HF_TOKEN
 ENV HF_TOKEN=""
