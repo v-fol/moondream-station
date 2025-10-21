@@ -9,3 +9,4 @@ pillow>=9.0
 packaging>=21.0
 posthog>=3.0.0
 prompt-toolkit>=3.0.0
+huggingface_hub[cli]==0.35.0
