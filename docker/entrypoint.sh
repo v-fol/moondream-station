@@ -25,7 +25,6 @@ cat > /root/.moondream-station/config.json <<EOF
   "current_model": null,
   "service_port": ${SERVICE_PORT},
   "models_dir": "/root/.moondream-station/models",
-  "update_endpoint": "https://api.github.com/repos/m87/moondream-station/releases/latest",
   "service_host": "${SERVICE_HOST}",
   "auto_start": true,
   "log_level": "INFO",
