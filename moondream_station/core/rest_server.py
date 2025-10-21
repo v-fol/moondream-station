@@ -5,7 +5,7 @@ import uvicorn
 
 from threading import Thread
 from typing import Any, Dict
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .inference_service import InferenceService
@@ -22,6 +22,31 @@ class RestServer:
         self.server = None
         self.server_thread = None
         self._setup_routes()
+
+    async def _verify_api_key(self, request: Request):
+        """Verify API key from X-Auth header"""
+        api_key = self.config.get("detection_api_key")
+        
+        # If no API key is configured, skip authentication
+        if not api_key:
+            return True
+            
+        # Get the API key from the X-Auth header
+        auth_header = request.headers.get("X-API-Key")
+        
+        if not auth_header:
+            raise HTTPException(
+                status_code=401, 
+                detail="Missing X-API-Key header"
+            )
+            
+        if auth_header != api_key:
+            raise HTTPException(
+                status_code=401, 
+                detail="Invalid API key"
+            )
+            
+        return True
 
     def _sse_event_generator(self, raw_generator):
         """Convert generator tokens to Server-Sent Events format with token counting"""
@@ -47,11 +72,11 @@ class RestServer:
 
     def _setup_routes(self):
         @self.app.get("/health")
-        async def health():
+        async def health(auth: bool = Depends(self._verify_api_key)):
             return {"status": "ok", "server": "moondream-station"}
 
         @self.app.get("/v1/models")
-        async def list_models():
+        async def list_models(auth: bool = Depends(self._verify_api_key)):
             models = self.manifest_manager.get_models()
             return {
                 "models": [
@@ -66,7 +91,7 @@ class RestServer:
             }
 
         @self.app.get("/v1/stats")
-        async def get_stats():
+        async def get_stats(auth: bool = Depends(self._verify_api_key)):
             stats = self.inference_service.get_stats()
             # Add requests processed from session state
             if self.session_state:
@@ -78,7 +103,7 @@ class RestServer:
         @self.app.api_route(
             "/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
         )
-        async def dynamic_route(request: Request, path: str):
+        async def dynamic_route(request: Request, path: str, auth: bool = Depends(self._verify_api_key)):
             return await self._handle_dynamic_request(request, path)
 
     async def _handle_dynamic_request(self, request: Request, path: str):

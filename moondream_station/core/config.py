@@ -1,4 +1,5 @@
 import json
+import os
 
 from pathlib import Path
 from typing import Any, Dict
@@ -54,6 +55,7 @@ class ConfigManager:
             "inference_max_queue_size": INFERENCE_MAX_QUEUE_SIZE,
             "inference_timeout": INFERENCE_TIMEOUT,
             "logging": True,
+            "detection_api_key": os.getenv("DETECTION_API_KEY"),
         }
 
     def _save_config(self):
