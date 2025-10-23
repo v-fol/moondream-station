@@ -36,8 +36,10 @@ class ModelService:
         self.device = self._get_best_device()
 
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name, revision=revision, trust_remote_code=True
+            model_name, revision=revision, trust_remote_code=True, dtype=torch.bfloat16
         )
+
+        self.model.compile()
 
         if torch.cuda.is_available():
             self.model = self.model.cuda()
