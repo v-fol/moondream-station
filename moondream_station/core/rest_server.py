@@ -497,40 +497,9 @@ class RestServer:
                 return
             self.shutdown_attempted = True
         
-        pod_id = os.environ.get("RUNPOD_POD_ID")
-        if not pod_id:
-            self.logger.error(
-                "Cannot shutdown pod: RUNPOD_POD_ID environment variable not set"
-            )
-            return
-        
-        self.logger.info(f"Attempting to shutdown pod {pod_id}...")
-        
-        # Validate pod_id to prevent command injection
-        if not pod_id.replace("-", "").replace("_", "").isalnum():
-            self.logger.error(f"Invalid pod ID format: {pod_id}")
-            return
-        
         try:
-            # Check if runpodctl is available
-            check_result = subprocess.run(
-                ["which", "runpodctl"],
-                capture_output=True,
-                timeout=2,
-                text=True
-            )
-            
-            if check_result.returncode != 0:
-                self.logger.error(
-                    "runpodctl command not found. Cannot shutdown pod. "
-                    "Make sure runpodctl is installed and in PATH."
-                )
-                return
-            
-            # Execute shutdown command with timeout
-            self.logger.info(f"Executing: runpodctl remove pod {pod_id}")
             result = subprocess.run(
-                ["runpodctl", "remove", "pod", pod_id],
+                ["runpodctl", "remove", "pod", '$RUNPOD_POD_ID'],
                 capture_output=True,
                 timeout=30,  # 30 second timeout for the command
                 text=True
