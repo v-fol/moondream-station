@@ -491,15 +491,10 @@ class RestServer:
     
     def _shutdown_pod(self):
         """Execute runpodctl remove pod command to terminate the pod"""
-        with self.shutdown_lock:
-            if self.shutdown_attempted:
-                self.logger.warning("Shutdown already attempted, skipping")
-                return
-            self.shutdown_attempted = True
-        
         try:
+            self.logger.info(f"Attempting to shutdown pod {os.environ.get('RUNPOD_POD_ID')}...")
             result = subprocess.run(
-                ["runpodctl", "remove", "pod", '$RUNPOD_POD_ID'],
+                ["runpodctl", "remove", "pod", os.environ.get('RUNPOD_POD_ID')],
                 capture_output=True,
                 timeout=30,  # 30 second timeout for the command
                 text=True
