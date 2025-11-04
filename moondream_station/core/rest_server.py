@@ -1,10 +1,13 @@
 import asyncio
 import json
+import os
+import subprocess
 import time
 import uvicorn
+import logging
 
-from threading import Thread
-from typing import Any, Dict
+from threading import Thread, Event, Lock
+from typing import Any, Dict, Optional
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -21,7 +24,31 @@ class RestServer:
         self.app = FastAPI(title="Moondream Station Inference Server", version="1.0.0")
         self.server = None
         self.server_thread = None
+        
+        # Shutdown monitor configuration
+        self.shutdown_enabled = self.config.get("shutdown_monitor_enabled", 
+            os.getenv("SHUTDOWN_MONITOR_ENABLED", "true").lower() == "true")
+        self.shutdown_check_interval = float(self.config.get("shutdown_check_interval",
+            os.getenv("SHUTDOWN_CHECK_INTERVAL", "30.0")))
+        self.shutdown_timeout = float(self.config.get("shutdown_timeout",
+            os.getenv("SHUTDOWN_TIMEOUT", "30.0")))
+        
+        # Shutdown monitor state
+        self.shutdown_thread: Optional[Thread] = None
+        self.shutdown_event = Event()
+        self.shutdown_lock = Lock()
+        self.last_idle_time: Optional[float] = None
+        self.consecutive_idle_checks = 0
+        self.shutdown_attempted = False
+        
+        # Setup logger for shutdown monitor
+        self.logger = logging.getLogger(__name__)
+        
         self._setup_routes()
+        
+        # Start shutdown monitor if enabled
+        if self.shutdown_enabled:
+            self._start_shutdown_monitor()
 
     async def _verify_api_key(self, request: Request):
         """Verify API key from X-Auth header"""
@@ -261,6 +288,9 @@ class RestServer:
 
     def stop(self) -> bool:
         """Stop the REST server properly"""
+        # Stop shutdown monitor first
+        self._stop_shutdown_monitor()
+        
         if self.server:
             # Signal server to stop
             self.server.should_exit = True
@@ -312,3 +342,215 @@ class RestServer:
             and self.server
             and not self.server.should_exit
         )
+    
+    def _start_shutdown_monitor(self):
+        """Start background thread to monitor queue and shutdown if idle"""
+        if not self.shutdown_enabled:
+            self.logger.info("Shutdown monitor is disabled")
+            return
+        
+        pod_id = os.environ.get("RUNPOD_POD_ID")
+        if not pod_id:
+            self.logger.warning(
+                "Shutdown monitor enabled but RUNPOD_POD_ID not set. "
+                "Monitor will log warnings but cannot shutdown pod."
+            )
+        
+        self.logger.info(
+            f"Starting shutdown monitor: check_interval={self.shutdown_check_interval}s, "
+            f"timeout={self.shutdown_timeout}s, pod_id={pod_id or 'NOT_SET'}"
+        )
+        
+        def monitor_loop():
+            """Main monitoring loop - runs in background thread"""
+            consecutive_errors = 0
+            max_consecutive_errors = 5
+            
+            while not self.shutdown_event.is_set():
+                try:
+                    # Wait for check interval or until event is set
+                    if self.shutdown_event.wait(self.shutdown_check_interval):
+                        # Event was set, exit gracefully
+                        break
+                    
+                    # Check if we should skip this check (e.g., after shutdown attempt)
+                    with self.shutdown_lock:
+                        if self.shutdown_attempted:
+                            self.logger.info("Shutdown already attempted, stopping monitor")
+                            break
+                    
+                    # Get current stats - handle errors gracefully
+                    try:
+                        stats = self.inference_service.get_stats()
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get inference stats: {e}")
+                        consecutive_errors += 1
+                        if consecutive_errors >= max_consecutive_errors:
+                            self.logger.error(
+                                f"Too many consecutive errors ({consecutive_errors}), "
+                                "stopping shutdown monitor"
+                            )
+                            break
+                        continue
+                    
+                    # Reset error counter on success
+                    consecutive_errors = 0
+                    
+                    # Extract queue and processing counts with safe defaults
+                    queue_size = stats.get("queue_size", 0)
+                    processing = stats.get("processing", 0)
+                    
+                    # Handle case where stats might not have expected keys
+                    if not isinstance(queue_size, (int, float)) or not isinstance(processing, (int, float)):
+                        self.logger.warning(
+                            f"Invalid stats format: queue_size={queue_size}, processing={processing}"
+                        )
+                        continue
+                    
+                    queue_size = int(queue_size)
+                    processing = int(processing)
+                    
+                    # Check if idle
+                    if queue_size == 0 and processing == 0:
+                        current_time = time.time()
+                        
+                        with self.shutdown_lock:
+                            if self.last_idle_time is None:
+                                self.last_idle_time = current_time
+                                self.consecutive_idle_checks = 1
+                                self.logger.debug(
+                                    f"Service idle detected (queue={queue_size}, processing={processing}), "
+                                    f"starting timeout timer"
+                                )
+                            else:
+                                idle_duration = current_time - self.last_idle_time
+                                self.consecutive_idle_checks += 1
+                                
+                                # Log progress periodically
+                                if self.consecutive_idle_checks % 10 == 0:
+                                    self.logger.info(
+                                        f"Service idle for {idle_duration:.1f}s "
+                                        f"({self.consecutive_idle_checks} checks)"
+                                    )
+                                
+                                # Check if timeout exceeded
+                                if idle_duration >= self.shutdown_timeout:
+                                    self.logger.info(
+                                        f"Shutdown timeout exceeded ({idle_duration:.1f}s >= {self.shutdown_timeout}s). "
+                                        f"Queue and processing are both 0. Initiating pod shutdown."
+                                    )
+                                    self._shutdown_pod()
+                                    break
+                    else:
+                        # Reset idle timer if there's work
+                        with self.shutdown_lock:
+                            if self.last_idle_time is not None:
+                                was_idle_duration = time.time() - self.last_idle_time
+                                self.logger.debug(
+                                    f"Service no longer idle (queue={queue_size}, processing={processing}). "
+                                    f"Was idle for {was_idle_duration:.1f}s"
+                                )
+                            self.last_idle_time = None
+                            self.consecutive_idle_checks = 0
+                    
+                except Exception as e:
+                    # Catch-all for any unexpected errors
+                    self.logger.error(f"Unexpected error in shutdown monitor loop: {e}", exc_info=True)
+                    consecutive_errors += 1
+                    if consecutive_errors >= max_consecutive_errors:
+                        self.logger.error(
+                            f"Too many consecutive errors ({consecutive_errors}), "
+                            "stopping shutdown monitor"
+                        )
+                        break
+                    # Wait a bit before retrying after error
+                    time.sleep(min(self.shutdown_check_interval, 5.0))
+            
+            self.logger.info("Shutdown monitor thread exiting")
+        
+        # Start the monitoring thread
+        self.shutdown_thread = Thread(target=monitor_loop, daemon=True, name="ShutdownMonitor")
+        self.shutdown_thread.start()
+        self.logger.info("Shutdown monitor thread started")
+    
+    def _stop_shutdown_monitor(self):
+        """Stop the shutdown monitor thread gracefully"""
+        if not self.shutdown_thread or not self.shutdown_thread.is_alive():
+            return
+        
+        self.logger.info("Stopping shutdown monitor...")
+        self.shutdown_event.set()
+        
+        # Wait for thread to finish (with timeout)
+        if self.shutdown_thread.is_alive():
+            self.shutdown_thread.join(timeout=5.0)
+            if self.shutdown_thread.is_alive():
+                self.logger.warning("Shutdown monitor thread did not exit cleanly")
+            else:
+                self.logger.info("Shutdown monitor stopped")
+    
+    def _shutdown_pod(self):
+        """Execute runpodctl remove pod command to terminate the pod"""
+        with self.shutdown_lock:
+            if self.shutdown_attempted:
+                self.logger.warning("Shutdown already attempted, skipping")
+                return
+            self.shutdown_attempted = True
+        
+        pod_id = os.environ.get("RUNPOD_POD_ID")
+        if not pod_id:
+            self.logger.error(
+                "Cannot shutdown pod: RUNPOD_POD_ID environment variable not set"
+            )
+            return
+        
+        self.logger.info(f"Attempting to shutdown pod {pod_id}...")
+        
+        # Validate pod_id to prevent command injection
+        if not pod_id.replace("-", "").replace("_", "").isalnum():
+            self.logger.error(f"Invalid pod ID format: {pod_id}")
+            return
+        
+        try:
+            # Check if runpodctl is available
+            check_result = subprocess.run(
+                ["which", "runpodctl"],
+                capture_output=True,
+                timeout=2,
+                text=True
+            )
+            
+            if check_result.returncode != 0:
+                self.logger.error(
+                    "runpodctl command not found. Cannot shutdown pod. "
+                    "Make sure runpodctl is installed and in PATH."
+                )
+                return
+            
+            # Execute shutdown command with timeout
+            self.logger.info(f"Executing: runpodctl remove pod {pod_id}")
+            result = subprocess.run(
+                ["runpodctl", "remove", "pod", pod_id],
+                capture_output=True,
+                timeout=30,  # 30 second timeout for the command
+                text=True
+            )
+            
+            if result.returncode == 0:
+                self.logger.info(f"Successfully initiated pod shutdown: {result.stdout}")
+            else:
+                self.logger.error(
+                    f"Failed to shutdown pod (exit code {result.returncode}): "
+                    f"{result.stderr or result.stdout}"
+                )
+                
+        except subprocess.TimeoutExpired:
+            self.logger.error("runpodctl command timed out after 30 seconds")
+        except FileNotFoundError:
+            self.logger.error(
+                "runpodctl command not found. Make sure runpodctl is installed and in PATH."
+            )
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"runpodctl command failed: {e}")
+        except Exception as e:
+            self.logger.error(f"Unexpected error while shutting down pod: {e}", exc_info=True)

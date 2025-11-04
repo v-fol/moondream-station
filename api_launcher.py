@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import sys
+import os
+import logging
 from pathlib import Path
 import uvicorn
 
@@ -11,6 +13,14 @@ from moondream_station.core.rest_server import RestServer
 from moondream_station.core.analytics import Analytics
 from moondream_station.session import SessionState
 
+# Configure logging for shutdown monitor visibility
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
 # Initialize
 config = ConfigManager()
 manifest_manager = ManifestManager(config)
@@ -19,6 +29,23 @@ manifest_manager.load_manifest("./local_manifest.json")
 # Get default model
 model_name = manifest_manager.get_available_default_model()
 config.set("current_model", model_name)
+
+# Configure shutdown monitor settings (can be overridden via environment variables)
+# SHUTDOWN_MONITOR_ENABLED: "true" or "false" (default: "true")
+# SHUTDOWN_CHECK_INTERVAL: seconds between checks (default: 30.0)
+# SHUTDOWN_TIMEOUT: seconds idle before shutdown (default: 30.0)
+if os.getenv("SHUTDOWN_MONITOR_ENABLED"):
+    config.set("shutdown_monitor_enabled", os.getenv("SHUTDOWN_MONITOR_ENABLED").lower() == "true")
+if os.getenv("SHUTDOWN_CHECK_INTERVAL"):
+    try:
+        config.set("shutdown_check_interval", float(os.getenv("SHUTDOWN_CHECK_INTERVAL")))
+    except ValueError:
+        print(f"Warning: Invalid SHUTDOWN_CHECK_INTERVAL value, using default")
+if os.getenv("SHUTDOWN_TIMEOUT"):
+    try:
+        config.set("shutdown_timeout", float(os.getenv("SHUTDOWN_TIMEOUT")))
+    except ValueError:
+        print(f"Warning: Invalid SHUTDOWN_TIMEOUT value, using default")
 
 # Setup server
 analytics = Analytics(config, manifest_manager)
