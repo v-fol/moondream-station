@@ -399,9 +399,10 @@ class RestServer:
                     # Extract queue and processing counts with safe defaults
                     queue_size = stats.get("queue_size", 0)
                     processing = stats.get("processing", 0)
+                    requests_processed = stats.get("requests_processed", 0)
                     
                     # Handle case where stats might not have expected keys
-                    if not isinstance(queue_size, (int, float)) or not isinstance(processing, (int, float)):
+                    if not isinstance(queue_size, (int, float)) or not isinstance(processing, (int, float)) or not isinstance(requests_processed, (int, float)):
                         self.logger.warning(
                             f"Invalid stats format: queue_size={queue_size}, processing={processing}"
                         )
@@ -409,9 +410,10 @@ class RestServer:
                     
                     queue_size = int(queue_size)
                     processing = int(processing)
+                    requests_processed = int(requests_processed)
                     
                     # Check if idle
-                    if queue_size == 0 and processing == 0:
+                    if queue_size == 0 and processing == 0 and requests_processed > 0:
                         current_time = time.time()
                         
                         with self.shutdown_lock:
