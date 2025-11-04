@@ -413,7 +413,7 @@ class RestServer:
                     requests_processed = int(requests_processed)
                     
                     # Check if idle
-                    if queue_size == 0 and processing == 0 and requests_processed > 0:
+                    if queue_size == 0 and processing == 0 and requests_processed > 1:
                         current_time = time.time()
                         
                         with self.shutdown_lock:
