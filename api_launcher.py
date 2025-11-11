@@ -24,7 +24,7 @@ logging.basicConfig(
 # Initialize
 config = ConfigManager()
 manifest_manager = ManifestManager(config)
-manifest_manager.load_manifest(f"{os.getenv('MDS_MANIFEST_PATH', '/local_manifest.json')}")
+manifest_manager.load_manifest(f"{os.getenv('MDS_MANIFEST_PATH', '.')}/local_manifest.json")
 
 # Get default model
 model_name = manifest_manager.get_available_default_model()
