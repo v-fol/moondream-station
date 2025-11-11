@@ -10,5 +10,7 @@ pip install -r /workspace/moondream-station/requirements.txt
 echo "Installing backend requirements..."
 pip install -r /workspace/moondream-station/backends/mds_backend_0/requirements.txt
 
+cd /workspace/moondream-station
+
 echo "Starting API server..."
-python3 /workspace/moondream-station/api_launcher.py
+python3 api_launcher.py
