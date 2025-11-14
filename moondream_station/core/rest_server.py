@@ -40,6 +40,7 @@ class RestServer:
         self.last_idle_time: Optional[float] = None
         self.consecutive_idle_checks = 0
         self.shutdown_attempted = False
+        self.last_requests_processed: int = 0
         
         # Setup logger for shutdown monitor
         self.logger = logging.getLogger(__name__)
@@ -344,7 +345,7 @@ class RestServer:
         )
     
     def _start_shutdown_monitor(self):
-        """Start background thread to monitor queue and shutdown if idle"""
+        """Start background thread to monitor requests_processed and shutdown if idle"""
         if not self.shutdown_enabled:
             self.logger.info("Shutdown monitor is disabled")
             return
@@ -379,11 +380,22 @@ class RestServer:
                             self.logger.info("Shutdown already attempted, stopping monitor")
                             break
                     
-                    # Get current stats - handle errors gracefully
+                    # Get current requests_processed count
+                    if not self.session_state:
+                        self.logger.info("Session state not available, skipping check")
+                        consecutive_errors += 1
+                        if consecutive_errors >= max_consecutive_errors:
+                            self.logger.error(
+                                f"Too many consecutive errors ({consecutive_errors}), "
+                                "stopping shutdown monitor"
+                            )
+                            break
+                        continue
+                    
                     try:
-                        stats = self.inference_service.get_stats()
-                    except Exception as e:
-                        self.logger.warning(f"Failed to get inference stats: {e}")
+                        current_requests_processed = int(self.session_state.state.get("requests_processed", 0))
+                    except (ValueError, TypeError) as e:
+                        self.logger.info(f"Invalid requests_processed value: {e}")
                         consecutive_errors += 1
                         if consecutive_errors >= max_consecutive_errors:
                             self.logger.error(
@@ -396,64 +408,69 @@ class RestServer:
                     # Reset error counter on success
                     consecutive_errors = 0
                     
-                    # Extract queue and processing counts with safe defaults
-                    queue_size = stats.get("queue_size", 0)
-                    processing = stats.get("processing", 0)
-                    requests_processed = self.session_state.state.get("requests_processed", 0)
-                    
-                    # Handle case where stats might not have expected keys
-                    if not isinstance(queue_size, (int, float)) or not isinstance(processing, (int, float)) or not isinstance(requests_processed, (int, float)):
-                        self.logger.warning(
-                            f"Invalid stats format: queue_size={queue_size}, processing={processing}"
-                        )
-                        continue
-                    
-                    queue_size = int(queue_size)
-                    processing = int(processing)
-                    requests_processed = int(requests_processed)
-                    
-                    # Check if idle
-                    if queue_size == 0 and processing == 0 and requests_processed > 1:
-                        current_time = time.time()
-                        
-                        with self.shutdown_lock:
-                            if self.last_idle_time is None:
-                                self.last_idle_time = current_time
-                                self.consecutive_idle_checks = 1
-                                self.logger.debug(
-                                    f"Service idle detected (queue={queue_size}, processing={processing}), "
-                                    f"starting timeout timer"
-                                )
-                            else:
-                                idle_duration = current_time - self.last_idle_time
-                                self.consecutive_idle_checks += 1
-                                
-                                # Log progress periodically
-                                if self.consecutive_idle_checks % 10 == 0:
-                                    self.logger.info(
-                                        f"Service idle for {idle_duration:.1f}s "
-                                        f"({self.consecutive_idle_checks} checks)"
-                                    )
-                                
-                                # Check if timeout exceeded
-                                if idle_duration >= self.shutdown_timeout:
-                                    self.logger.info(
-                                        f"Shutdown timeout exceeded ({idle_duration:.1f}s >= {self.shutdown_timeout}s). "
-                                        f"Queue and processing are both 0. Initiating pod shutdown."
-                                    )
-                                    self._shutdown_pod()
-                                    break
-                    else:
-                        # Reset idle timer if there's work
-                        with self.shutdown_lock:
+                    # Check if requests_processed has increased since last check
+                    with self.shutdown_lock:
+                        if current_requests_processed > self.last_requests_processed:
+                            # Server is functioning - requests are being processed
                             if self.last_idle_time is not None:
                                 was_idle_duration = time.time() - self.last_idle_time
-                                self.logger.debug(
-                                    f"Service no longer idle (queue={queue_size}, processing={processing}). "
-                                    f"Was idle for {was_idle_duration:.1f}s"
+                                self.logger.info(
+                                    f"Server active: requests_processed increased from {self.last_requests_processed} "
+                                    f"to {current_requests_processed}. Was idle for {was_idle_duration:.1f}s"
                                 )
+                            # Reset idle timer
                             self.last_idle_time = None
                             self.consecutive_idle_checks = 0
+                            self.last_requests_processed = current_requests_processed
+                        else:
+                            # No new requests processed - server may be idle
+                            # Skip idle check if requests_processed <= 1 (server hasn't started receiving requests yet)
+                            if current_requests_processed <= 1:
+                                self.logger.info(
+                                    f"Skipping idle check: requests_processed={current_requests_processed} "
+                                    f"(waiting for server to process at least one request)"
+                                )
+                                # Reset idle timer if it was set
+                                if self.last_idle_time is not None:
+                                    self.last_idle_time = None
+                                    self.consecutive_idle_checks = 0
+                                # Update last_requests_processed for tracking
+                                self.last_requests_processed = current_requests_processed
+                            else:
+                                # Server has processed requests, now we can monitor for idle
+                                current_time = time.time()
+                                
+                                if self.last_idle_time is None:
+                                    # Start tracking idle time
+                                    self.last_idle_time = current_time
+                                    self.consecutive_idle_checks = 1
+                                    self.logger.info(
+                                        f"Server idle detected: requests_processed unchanged at {current_requests_processed}, "
+                                        f"starting timeout timer"
+                                    )
+                                else:
+                                    # Continue tracking idle time
+                                    idle_duration = current_time - self.last_idle_time
+                                    self.consecutive_idle_checks += 1
+                                    
+                                    # Log progress periodically
+                                    if self.consecutive_idle_checks % 10 == 0:
+                                        self.logger.info(
+                                            f"Server idle for {idle_duration:.1f}s "
+                                            f"({self.consecutive_idle_checks} checks, requests_processed={current_requests_processed})"
+                                        )
+                                    
+                                    # Check if timeout exceeded
+                                    if idle_duration >= self.shutdown_timeout:
+                                        self.logger.info(
+                                            f"Shutdown timeout exceeded ({idle_duration:.1f}s >= {self.shutdown_timeout}s). "
+                                            f"requests_processed unchanged at {current_requests_processed}. Initiating pod shutdown."
+                                        )
+                                        self._shutdown_pod()
+                                        break
+                                
+                                # Update last_requests_processed even if unchanged (for tracking)
+                                self.last_requests_processed = current_requests_processed
                     
                 except Exception as e:
                     # Catch-all for any unexpected errors
